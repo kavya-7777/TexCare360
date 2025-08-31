@@ -5,8 +5,10 @@ import "./Technicians.css";
 function Technicians({ technicians, setTechnicians }) {
   const [showModal, setShowModal] = useState(false);
   const [newTech, setNewTech] = useState({ name: "", skill: "", status: "Available" });
+  const [filter, setFilter] = useState("All");
+  const [search, setSearch] = useState("");
 
-  // Handle input change
+  // Handle input change in modal
   const handleChange = (e) => {
     const { name, value } = e.target;
     setNewTech((prev) => ({ ...prev, [name]: value }));
@@ -31,14 +33,46 @@ function Technicians({ technicians, setTechnicians }) {
     setTechnicians((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // ✅ Apply filter + search
+  const filteredTechs = technicians.filter((tech) => {
+    const matchesFilter = filter === "All" ? true : tech.status === filter;
+    const matchesSearch =
+      tech.name.toLowerCase().includes(search.toLowerCase()) ||
+      tech.skill.toLowerCase().includes(search.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
   return (
     <div className="technicians-page">
-      <h2 className="mb-4">Technicians</h2>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h2>Technicians</h2>
+
+        {/* Filter dropdown */}
+        <Form.Select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          style={{ width: "200px" }}
+        >
+          <option value="All">All</option>
+          <option value="Available">Available</option>
+          <option value="Busy">Busy</option>
+        </Form.Select>
+      </div>
+
+      {/* ✅ Search bar */}
+      <Form.Control
+        type="text"
+        placeholder="Search by name or skill..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="mb-3"
+      />
 
       <Button variant="primary" className="mb-3" onClick={() => setShowModal(true)}>
         ➕ Add Technician
       </Button>
 
+      {/* Technician Table */}
       <Table striped bordered hover>
         <thead>
           <tr>
@@ -50,28 +84,36 @@ function Technicians({ technicians, setTechnicians }) {
           </tr>
         </thead>
         <tbody>
-          {technicians.map((tech) => (
-            <tr key={tech.id}>
-              <td>{tech.id}</td>
-              <td>{tech.name}</td>
-              <td>{tech.skill}</td>
-              <td>
-                <Badge bg={tech.status === "Available" ? "success" : "warning"}>
-                  {tech.status}
-                </Badge>
-              </td>
-              <td>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(tech.id)}
-                  disabled={tech.status === "Busy"}
-                >
-                  Delete
-                </Button>
+          {filteredTechs.length > 0 ? (
+            filteredTechs.map((tech) => (
+              <tr key={tech.id}>
+                <td>{tech.id}</td>
+                <td>{tech.name}</td>
+                <td>{tech.skill}</td>
+                <td>
+                  <Badge bg={tech.status === "Available" ? "success" : "warning"}>
+                    {tech.status}
+                  </Badge>
+                </td>
+                <td>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(tech.id)}
+                    disabled={tech.status === "Busy"} // Prevent delete if Busy
+                  >
+                    Delete
+                  </Button>
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan="5" className="text-center">
+                No technicians found.
               </td>
             </tr>
-          ))}
+          )}
         </tbody>
       </Table>
 

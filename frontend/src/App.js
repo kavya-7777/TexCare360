@@ -10,6 +10,13 @@ import { Container } from "react-bootstrap";
 
 function App() {
   const [logs, setLogs] = useState([]);
+  const [inventory, setInventory] = useState([
+    { id: 1, name: "Spare Needle", quantity: 10, supplier: "Supplier A", category: "Spare Parts" },
+    { id: 2, name: "Lubricant Oil", quantity: 8, supplier: "Supplier B", category: "Consumables" },
+    { id: 3, name: "Cotton Roll", quantity: 20, supplier: "Supplier C", category: "Raw Materials" }
+  ]);
+  const [stockHistory, setStockHistory] = useState([]);
+
 
   const [machines, setMachines] = useState([
     { id: 1, name: "Loom-101", status: "Healthy" },
@@ -68,8 +75,8 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/machines" element={<Machines machines={machines} setMachines={setMachines} assignTechnician={assignTechnician} technicians={technicians} logs={logs} />} />
           <Route path="/technicians" element={<Technicians technicians={technicians} setTechnicians={setTechnicians} />} />
-          <Route path="/maintenance-logs" element={<MaintenanceLogs logs={logs} freeTechnician={freeTechnician} setLogs={setLogs} machines={machines} setMachines={setMachines} />} />
-          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/maintenance-logs" element={<MaintenanceLogs logs={logs} freeTechnician={freeTechnician} setLogs={setLogs} machines={machines} setMachines={setMachines} inventory={inventory} setInventory={setInventory} stockHistory={stockHistory} setStockHistory={setStockHistory}/>} />
+          <Route path="/inventory" element={<Inventory inventory={inventory} setInventory={setInventory} logs={logs} setLogs={setLogs} stockHistory={stockHistory} setStockHistory={setStockHistory} machines={machines} setMachines={setMachines}  />} />
         </Routes>
       </Container>
     </Router>

@@ -61,22 +61,23 @@ function Machines({ machines, setMachines, assignTechnician, technicians, logs }
                   )}
                 </td>
                 <td>
-                  {assignedTech ? (
-                    <span>
-                      Assigned to <strong>{assignedTech.name}</strong>
-                    </span>
-                  ) : machine.status === "Unhealthy" ? (
-                    <Button
-                      variant="warning"
-                      size="sm"
-                      onClick={() => handleAssignClick(machine)}
-                    >
-                      Assign Technician
-                    </Button>
-                  ) : (
-                    <span>—</span>
-                  )}
-                </td>
+  {assignedTech ? (
+    <span>
+      Assigned to <strong>{assignedTech.name}</strong>
+    </span>
+  ) : machine.status === "Unhealthy" ? (
+    <Button
+      variant="warning"
+      size="sm"
+      onClick={() => handleAssignClick(machine)}
+    >
+      Assign Technician
+    </Button>
+  ) : (
+    <span>—</span> // ✅ Healthy → no Assign button
+  )}
+</td>
+
               </tr>
             );
           })}
