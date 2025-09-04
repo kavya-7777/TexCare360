@@ -1,0 +1,30 @@
+### Get all machines
+GET http://localhost:5000/api/machines
+
+### Add a new machine
+POST http://localhost:5000/api/machines
+Content-Type: application/json
+
+{
+  "name": "Loom-202",
+  "status": "Healthy"
+}
+
+### Update a machine
+PUT http://localhost:5000/api/machines/1
+Content-Type: application/json
+
+{
+  "status": "Unhealthy"
+}
+
+### Delete a machine
+DELETE http://localhost:5000/api/machines/1
+
+
+
+
+
+
+
+GET http://localhost:5000/api/inventory

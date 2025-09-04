@@ -1,28 +1,75 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { Table, Badge, Button, Modal } from "react-bootstrap";
 import "./Machines.css";
 
-function Machines({ machines, setMachines, assignTechnician, technicians, logs }) {
+function Machines({ machines, setMachines, technicians, setTechnicians, logs, setLogs, assignTechnician }) {
   const [showModal, setShowModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
 
+  // Fetch machines on mount
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/machines")
+      .then((res) => setMachines(res.data))
+      .catch((err) => console.error("Error fetching machines:", err));
+  }, [setMachines]);
+
+  // Open modal
   const handleAssignClick = (machine) => {
     setSelectedMachine(machine);
     setShowModal(true);
   };
 
-  const handleAssignTechnician = (tech) => {
-    assignTechnician(tech.id, selectedMachine.name, tech.skill);
+  // Assign technician
+  const handleAssignTechnician = async (machine, technician) => {
+    try {
+      if (!machine || !technician) return;
 
-    // ✅ Set machine status to Unhealthy (until task complete)
-    setMachines((prev) =>
-      prev.map((m) =>
-        m.id === selectedMachine.id ? { ...m, status: "Unhealthy" } : m
-      )
+      // 1️⃣ Optimistically update logs
+      const newLog = {
+        machine: machine.name,
+        technician: technician.name,
+        skill: technician.skill,
+        techId: technician.id,
+        date_time: new Date().toISOString().slice(0, 19).replace("T", " "),
+        completed: false,
+      };
+      setLogs((prev) => [...prev, newLog]);
+
+      // 2️⃣ Optimistically update technician status locally
+      setTechnicians((prev) =>
+        prev.map((t) =>
+          t.id === technician.id ? { ...t, status: "Busy" } : t
+        )
+      );
+
+      // 3️⃣ Close modal
+      setShowModal(false);
+      setSelectedMachine(null);
+
+      // 4️⃣ Update backend asynchronously
+      await axios.post("http://localhost:5000/api/logs", newLog);
+      await axios.put(
+        `http://localhost:5000/api/technicians/${technician.id}/status`,
+        { status: "Busy" }
+      );
+    } catch (err) {
+      console.error("Error assigning technician:", err);
+    }
+  };
+
+  // Get technician assigned to a machine
+  const getAssignedTechnician = (machineName) =>
+    technicians.find(
+      (t) =>
+        t.status === "Busy" &&
+        logs.some((l) => l.machine === machineName && l.technician === t.name && !l.completed)
     );
 
-    setShowModal(false);
-  };
+  // Available technicians dynamically calculated
+  const getAvailableTechnicians = () =>
+    technicians.filter((t) => t.status === "Available");
 
   return (
     <div className="machines-page">
@@ -38,17 +85,7 @@ function Machines({ machines, setMachines, assignTechnician, technicians, logs }
         </thead>
         <tbody>
           {machines.map((machine) => {
-            const assignedTech = technicians.find(
-              (t) =>
-                t.status === "Busy" &&
-                logs.some(
-                  (l) =>
-                    l.machine === machine.name &&
-                    l.technician === t.name &&
-                    !l.completed
-                )
-            );
-
+            const assignedTech = getAssignedTechnician(machine.name);
             return (
               <tr key={machine.id}>
                 <td>{machine.id}</td>
@@ -61,23 +98,22 @@ function Machines({ machines, setMachines, assignTechnician, technicians, logs }
                   )}
                 </td>
                 <td>
-  {assignedTech ? (
-    <span>
-      Assigned to <strong>{assignedTech.name}</strong>
-    </span>
-  ) : machine.status === "Unhealthy" ? (
-    <Button
-      variant="warning"
-      size="sm"
-      onClick={() => handleAssignClick(machine)}
-    >
-      Assign Technician
-    </Button>
-  ) : (
-    <span>—</span> // ✅ Healthy → no Assign button
-  )}
-</td>
-
+                  {assignedTech ? (
+                    <span>
+                      Assigned to <strong>{assignedTech.name}</strong>
+                    </span>
+                  ) : machine.status === "Unhealthy" ? (
+                    <Button
+                      variant="warning"
+                      size="sm"
+                      onClick={() => handleAssignClick(machine)}
+                    >
+                      Assign Technician
+                    </Button>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </td>
               </tr>
             );
           })}
@@ -93,32 +129,30 @@ function Machines({ machines, setMachines, assignTechnician, technicians, logs }
         </Modal.Header>
         <Modal.Body>
           <h5>Available Technicians</h5>
-          {technicians.length > 0 ? (
-            technicians.map((tech) => (
+          {getAvailableTechnicians().length > 0 ? (
+            getAvailableTechnicians().map((tech) => (
               <div
                 key={tech.id}
                 className="d-flex justify-content-between align-items-center mb-2"
               >
                 <span>
-                  {tech.name} ({tech.skill}) -{" "}
-                  {tech.status === "Available" ? (
-                    <Badge bg="success">Available</Badge>
-                  ) : (
-                    <Badge bg="secondary">Busy</Badge>
-                  )}
+                  {tech.name} ({tech.skill}) <Badge bg="success">Available</Badge>
                 </span>
                 <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => handleAssignTechnician(tech)}
-                  disabled={tech.status !== "Available"} // disable Busy techs
-                >
-                  Assign
-                </Button>
+    variant="primary"
+    size="sm"
+    onClick={() => assignTechnician(tech.id, selectedMachine.name, tech.skill, () => {
+        setShowModal(false);
+        setSelectedMachine(null);
+    })}
+>
+    Assign
+</Button>
+
               </div>
             ))
           ) : (
-            <p>No technicians found.</p>
+            <p>No available technicians right now.</p>
           )}
         </Modal.Body>
       </Modal>

@@ -1,12 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Button, Modal, Form, Badge } from "react-bootstrap";
 import "./Technicians.css";
 
 function Technicians({ technicians, setTechnicians }) {
   const [showModal, setShowModal] = useState(false);
-  const [newTech, setNewTech] = useState({ name: "", skill: "", status: "Available" });
+  const [newTech, setNewTech] = useState({
+    name: "",
+    skill: "",
+    status: "Available",
+  });
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
+
+  // ✅ Fetch technicians from backend on load
+  useEffect(() => {
+    fetch("http://localhost:5000/api/technicians")
+      .then((res) => res.json())
+      .then((data) => setTechnicians(data))
+      .catch((err) => console.error("Error fetching technicians:", err));
+  }, [setTechnicians]);
 
   // Handle input change in modal
   const handleChange = (e) => {
@@ -14,33 +26,44 @@ function Technicians({ technicians, setTechnicians }) {
     setNewTech((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Add technician
-  const handleAddTechnician = () => {
+  // ✅ Add technician (POST request)
+const handleAddTechnician = () => {
     if (!newTech.name || !newTech.skill) return;
 
-    const newEntry = {
-      id: technicians.length + 1,
-      ...newTech,
-    };
+    fetch("http://localhost:5000/api/technicians", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newTech),
+    })
+      .then((res) => res.json())
+      .then((addedTech) => {
+        setTechnicians((prev) => [...prev, addedTech]);
+      });
 
-    setTechnicians((prev) => [...prev, newEntry]);
     setNewTech({ name: "", skill: "", status: "Available" });
     setShowModal(false);
   };
 
-  // Delete technician
+  // ✅ Delete technician (DELETE request)
   const handleDelete = (id) => {
-    setTechnicians((prev) => prev.filter((t) => t.id !== id));
+    fetch(`http://localhost:5000/api/technicians/${id}`, {
+      method: "DELETE",
+    })
+      .then((res) => res.json())
+      .then(() => {
+        setTechnicians((prev) => prev.filter((t) => t.id !== id));
+      });
   };
 
-  // ✅ Apply filter + search
-  const filteredTechs = technicians.filter((tech) => {
-    const matchesFilter = filter === "All" ? true : tech.status === filter;
-    const matchesSearch =
-      tech.name.toLowerCase().includes(search.toLowerCase()) ||
-      tech.skill.toLowerCase().includes(search.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  // ✅ Apply filter + search (unchanged)
+const filteredTechs = (technicians || []).filter((tech) => {
+  const matchesFilter = filter === "All" ? true : tech.status === filter;
+  const matchesSearch =
+    tech.name.toLowerCase().includes(search.toLowerCase()) ||
+    tech.skill.toLowerCase().includes(search.toLowerCase());
+  return matchesFilter && matchesSearch;
+});
+
 
   return (
     <div className="technicians-page">
@@ -68,7 +91,11 @@ function Technicians({ technicians, setTechnicians }) {
         className="mb-3"
       />
 
-      <Button variant="primary" className="mb-3" onClick={() => setShowModal(true)}>
+      <Button
+        variant="primary"
+        className="mb-3"
+        onClick={() => setShowModal(true)}
+      >
         ➕ Add Technician
       </Button>
 
@@ -91,7 +118,9 @@ function Technicians({ technicians, setTechnicians }) {
                 <td>{tech.name}</td>
                 <td>{tech.skill}</td>
                 <td>
-                  <Badge bg={tech.status === "Available" ? "success" : "warning"}>
+                  <Badge
+                    bg={tech.status === "Available" ? "success" : "warning"}
+                  >
                     {tech.status}
                   </Badge>
                 </td>

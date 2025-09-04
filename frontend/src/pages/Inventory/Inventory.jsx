@@ -1,12 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Table, Button, Modal, Form, Badge, Alert } from "react-bootstrap";
+import axios from "axios";
 import "./Inventory.css";
 
-function Inventory({ inventory, setInventory, logs, setLogs, stockHistory, setStockHistory }) {
+function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
   const [showModal, setShowModal] = useState(false);
-  const [restockModal, setRestockModal] = useState(false); 
-  const [restockItem, setRestockItem] = useState(null);    
-  const [restockQty, setRestockQty] = useState(0);         
+  const [restockModal, setRestockModal] = useState(false);
+  const [restockItem, setRestockItem] = useState(null);
+  const [restockQty, setRestockQty] = useState(0);
   const [newItem, setNewItem] = useState({
     name: "",
     category: "Spare Parts",
@@ -16,8 +17,14 @@ function Inventory({ inventory, setInventory, logs, setLogs, stockHistory, setSt
     expiry: "",
   });
   const [filter, setFilter] = useState("All");
-  const [stockFilter, setStockFilter] = useState("All");
 
+  // ✅ Fetch inventory from backend (already camelCase)
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/inventory")
+      .then((res) => setInventory(res.data))
+      .catch((err) => console.error("Error fetching inventory:", err));
+  }, [setInventory]);
 
   // 🔎 filter items
   const filteredItems =
@@ -31,7 +38,7 @@ function Inventory({ inventory, setInventory, logs, setLogs, stockHistory, setSt
     setNewItem((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ➕ History log function
+  // ➕ History log
   const addHistory = (action, itemName, qtyChange, user = "Admin") => {
     const entry = {
       action,
@@ -44,83 +51,72 @@ function Inventory({ inventory, setInventory, logs, setLogs, stockHistory, setSt
   };
 
   // ✅ Restock handler
-  const handleRestockConfirm = () => {
+  const handleRestockConfirm = async () => {
     if (!restockItem || restockQty <= 0) return;
 
-    setInventory((prev) =>
-      prev.map((i) =>
-        i.id === restockItem.id
-          ? { ...i, quantity: i.quantity + parseInt(restockQty) }
-          : i
-      )
-    );
+    try {
+      const res = await axios.put(
+        `http://localhost:5000/api/inventory/${restockItem.id}`,
+        { ...restockItem, quantity: restockItem.quantity + parseInt(restockQty) }
+      );
 
-    addHistory("Restocked", restockItem.name, `+${restockQty}`);
+      setInventory((prev) =>
+        prev.map((i) => (i.id === restockItem.id ? res.data : i))
+      );
+
+      addHistory("Restocked", restockItem.name, `+${restockQty}`);
+    } catch (error) {
+      console.error("Error updating stock:", error);
+    }
 
     setRestockModal(false);
     setRestockItem(null);
     setRestockQty(0);
   };
 
-// Add item OR update existing stock
-const handleAddItem = () => {
-  if (!newItem.name || !newItem.quantity) return;
+  // ✅ Add item
+  const handleAddItem = async () => {
+    if (!newItem.name || !newItem.quantity) return;
 
-  const existingItem = inventory.find(
-    (i) => i.name.toLowerCase() === newItem.name.toLowerCase()
-  );
+    try {
+      const res = await axios.post("http://localhost:5000/api/inventory", newItem);
+      setInventory((prev) => [...prev, res.data]);
+      addHistory("Added", res.data.name, `+${res.data.quantity}`);
+    } catch (error) {
+      console.error("Error adding item:", error);
+    }
 
-  if (existingItem) {
-    // ✅ Restocking existing item
-    const updatedInventory = inventory.map((i) =>
-      i.id === existingItem.id
-        ? { ...i, quantity: i.quantity + parseInt(newItem.quantity) }
-        : i
-    );
-    setInventory(updatedInventory);
-
-    // 📜 Log restock in history
-    addHistory("Restocked", existingItem.name, `+${newItem.quantity}`);
-
-  } else {
-    // ✅ Adding new item
-    const newEntry = {
-      id: inventory.length + 1,
-      ...newItem,
-      quantity: parseInt(newItem.quantity),
-    };
-    setInventory((prev) => [...prev, newEntry]);
-
-    // 📜 Log new addition in history
-    addHistory("Added", newEntry.name, `+${newEntry.quantity}`);
-  }
-
-  // reset modal form
-  setNewItem({
-    name: "",
-    category: "Spare Parts",
-    quantity: 0,
-    supplier: "",
-    leadTime: "",
-    expiry: "",
-  });
-  setShowModal(false);
-};
-
-
-  // Delete item
-  const handleDelete = (id) => {
-    const deletedItem = inventory.find((i) => i.id === id);
-    setInventory((prev) => prev.filter((i) => i.id !== id));
-    if (deletedItem) addHistory("Deleted", deletedItem.name, deletedItem.quantity);
+    setNewItem({
+      name: "",
+      category: "Spare Parts",
+      quantity: 0,
+      supplier: "",
+      leadTime: "",
+      expiry: "",
+    });
+    setShowModal(false);
   };
 
-  // Low stock alert
-  const lowStockItems = inventory.filter((i) => i.quantity <= 5);
+  // ✅ Delete item
+  const handleDelete = async (id) => {
+    const deletedItem = inventory.find((i) => i.id === id);
 
-  // 🚨 Supplier & Lead Time Alerts
+    try {
+      await axios.delete(`http://localhost:5000/api/inventory/${id}`);
+      setInventory((prev) => prev.filter((i) => i.id !== id));
+      if (deletedItem) addHistory("Deleted", deletedItem.name, deletedItem.quantity);
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
+  };
+
+  // 🚨 Alerts
+  const lowStockItems = inventory.filter((i) => i.quantity <= 5);
   const supplierAlerts = lowStockItems.map(
-    (i) => `Order ${i.name} from ${i.supplier || "Supplier"} (Lead Time: ${i.leadTime || "N/A"} days)`
+    (i) =>
+      `Order ${i.name} from ${i.supplier || "Supplier"} (Lead Time: ${
+        i.leadTime || "N/A"
+      } days)`
   );
 
   return (
@@ -151,15 +147,10 @@ const handleAddItem = () => {
         </Alert>
       )}
 
-      <Button
-        variant="primary"
-        className="mb-3"
-        onClick={() => setShowModal(true)}
-      >
+      <Button variant="primary" className="mb-3" onClick={() => setShowModal(true)}>
         ➕ Add Item
       </Button>
 
-      
       {/* Inventory Table */}
       <Table striped bordered hover>
         <thead>
@@ -176,10 +167,7 @@ const handleAddItem = () => {
         </thead>
         <tbody>
           {filteredItems.map((item) => (
-            <tr
-              key={item.id}
-              className={item.quantity <= 5 ? "table-danger" : ""}
-            >
+            <tr key={item.id} className={item.quantity <= 5 ? "table-danger" : ""}>
               <td>{item.id}</td>
               <td>{item.name}</td>
               <td>{item.category}</td>
@@ -197,25 +185,24 @@ const handleAddItem = () => {
               <td>{item.leadTime}</td>
               <td>{item.expiry || "N/A"}</td>
               <td className="d-flex gap-2">
-  <Button
-    variant="warning"
-    size="sm"
-    onClick={() => {
-      setRestockItem(item);
-      setRestockModal(true);
-    }}
-  >
-    Restock
-  </Button>
-  <Button
-    variant="danger"
-    size="sm"
-    onClick={() => handleDelete(item.id)}
-  >
-    Delete
-  </Button>
-</td>
-
+                <Button
+                  variant="warning"
+                  size="sm"
+                  onClick={() => {
+                    setRestockItem(item);
+                    setRestockModal(true);
+                  }}
+                >
+                  Restock
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDelete(item.id)}
+                >
+                  Delete
+                </Button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -266,11 +253,7 @@ const handleAddItem = () => {
 
             <Form.Group className="mb-3">
               <Form.Label>Category</Form.Label>
-              <Form.Select
-                name="category"
-                value={newItem.category}
-                onChange={handleChange}
-              >
+              <Form.Select name="category" value={newItem.category} onChange={handleChange}>
                 <option>Spare Parts</option>
                 <option>Raw Materials</option>
                 <option>Maintenance Supplies</option>
@@ -329,33 +312,32 @@ const handleAddItem = () => {
       </Modal>
 
       {/* Restock Modal */}
-<Modal show={restockModal} onHide={() => setRestockModal(false)}>
-  <Modal.Header closeButton>
-    <Modal.Title>Restock {restockItem?.name}</Modal.Title>
-  </Modal.Header>
-  <Modal.Body>
-    <Form>
-      <Form.Group>
-        <Form.Label>Quantity to Add</Form.Label>
-        <Form.Control
-          type="number"
-          value={restockQty}
-          onChange={(e) => setRestockQty(Number(e.target.value))}
-          min={1}
-        />
-      </Form.Group>
-    </Form>
-  </Modal.Body>
-  <Modal.Footer>
-    <Button variant="secondary" onClick={() => setRestockModal(false)}>
-      Cancel
-    </Button>
-    <Button variant="primary" onClick={handleRestockConfirm}>
-      Confirm Restock
-    </Button>
-  </Modal.Footer>
-</Modal>
-
+      <Modal show={restockModal} onHide={() => setRestockModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Restock {restockItem?.name}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group>
+              <Form.Label>Quantity to Add</Form.Label>
+              <Form.Control
+                type="number"
+                value={restockQty}
+                onChange={(e) => setRestockQty(Number(e.target.value))}
+                min={1}
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setRestockModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleRestockConfirm}>
+            Confirm Restock
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

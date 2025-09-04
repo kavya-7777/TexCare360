@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Table, Alert, Button, Badge, Modal, Form } from "react-bootstrap";
+import axios from "axios";
 import "./MaintenanceLogs.css";
 
 function MaintenanceLogs({
@@ -16,64 +17,68 @@ function MaintenanceLogs({
   const [showAlert, setShowAlert] = useState(false);
   const [lowStockAlert, setLowStockAlert] = useState("");
   const [supplierAlert, setSupplierAlert] = useState("");
-  const [errorAlert, setErrorAlert] = useState(""); // ❌ error shown on page
-  const [modalError, setModalError] = useState(""); // ❌ error shown inside modal
+  const [errorAlert, setErrorAlert] = useState(""); 
+  const [modalError, setModalError] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [selectedLogIndex, setSelectedLogIndex] = useState(null);
+  const [selectedLog, setSelectedLog] = useState(null);
   const [selectedPart, setSelectedPart] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [logFilter, setLogFilter] = useState("All");
 
+  // ✅ Fetch logs from backend
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/logs")
+      .then((res) => setLogs(res.data))
+      .catch((err) => console.error("Logs fetch error:", err));
+  }, [setLogs]);
 
-// ✅ Show "new log added" success alert for 3 sec
-useEffect(() => {
-  if (logs.length > 0) {
-    setShowAlert(true);
-    const timer = setTimeout(() => setShowAlert(false), 3000);
-    return () => clearTimeout(timer);
-  }
-}, [logs]);
+  // ✅ Show "new log added" success alert
+  useEffect(() => {
+    if (logs.length > 0) {
+      setShowAlert(true);
+      const timer = setTimeout(() => setShowAlert(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [logs]);
 
-// ✅ Auto-hide errorAlert after 3 sec
-useEffect(() => {
-  if (errorAlert) {
-    const timer = setTimeout(() => setErrorAlert(""), 3000);
-    return () => clearTimeout(timer);
-  }
-}, [errorAlert]);
-
+  // ✅ Auto-hide errorAlert
+  useEffect(() => {
+    if (errorAlert) {
+      const timer = setTimeout(() => setErrorAlert(""), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [errorAlert]);
 
   // Open modal before marking complete
-  const handleCompleteClick = (index) => {
-    setSelectedLogIndex(index);
+  const handleCompleteClick = (log) => {
+    setSelectedLog(log);
     setShowModal(true);
-    setModalError(""); // clear modal error when opening
+    setModalError("");
   };
 
-  // Finalize completion and deduct inventory
-  const handleCompleteConfirm = () => {
-    if (selectedLogIndex === null) return;
+// Finalize completion and deduct inventory
+const handleCompleteConfirm = async () => {
+  if (!selectedLog) return;
 
-    const updatedLogs = [...logs];
-    const log = updatedLogs[selectedLogIndex];
+  let updatedPartUsage = "";
 
+  try {
     if (selectedPart) {
       const selectedItem = inventory.find((i) => i.name === selectedPart);
       if (!selectedItem) return;
 
-      // ❌ Block invalid usage
       if (quantity > selectedItem.quantity) {
         const msg = `❌ Invalid! You cannot use ${quantity} units. Only ${selectedItem.quantity} available.`;
         setModalError(msg);
         setErrorAlert(
-          `⚠️ ${log.technician} tried to use ${quantity}x ${selectedItem.name}, but only ${selectedItem.quantity} left.`
+          `⚠️ ${selectedLog.technician} tried to use ${quantity}x ${selectedItem.name}, but only ${selectedItem.quantity} left.`
         );
         return;
       }
 
       const newQty = Math.max(selectedItem.quantity - quantity, 0);
 
-      // 🔔 Low stock alert
       if (newQty <= 5) {
         setLowStockAlert(
           `⚠️ Low Stock: ${selectedItem.name} has only ${newQty} left!`
@@ -81,51 +86,81 @@ useEffect(() => {
         setSupplierAlert(
           `👉 Order ${selectedItem.name} from ${
             selectedItem.supplier || "Supplier"
-          } (Lead Time: ${selectedItem.leadTime || "N/A"} days)`
+          } (Lead Time: ${selectedItem.lead_time || "N/A"} days)`
         );
       }
 
-      // 📜 Add stock history (ONLY ONCE)
-      setStockHistory((prevHistory) => [
-        ...prevHistory,
+      // ✅ Update inventory locally
+      setInventory((prev) =>
+        prev.map((item) =>
+          item.id === selectedItem.id ? { ...item, quantity: newQty } : item
+        )
+      );
+
+      // ✅ Add stock history (frontend)
+      setStockHistory((prev) => [
+        ...prev,
         {
           action: "Used",
           item: selectedItem.name,
           qtyChange: `-${quantity}`,
-          user: log.technician,
+          user: selectedLog.technician,
           date: new Date().toLocaleString(),
         },
       ]);
 
-      // Update inventory
-      setInventory((prev) =>
-        prev.map((item) =>
-          item.name === selectedPart ? { ...item, quantity: newQty } : item
-        )
-      );
+      updatedPartUsage = `${quantity} x ${selectedItem.name}`;
 
-      log.partsUsed = `${quantity} x ${selectedPart}`;
+      // ✅ Update inventory in DB
+      await axios.put(`http://localhost:5000/api/inventory/${selectedItem.id}`, {
+        quantity: newQty,
+      });
+
+      // ✅ Add stock history in DB
+      await axios.post(`http://localhost:5000/api/stock-history`, {
+        action: "Used",
+        item: selectedItem.name,
+        qty_change: -quantity,
+        user: selectedLog.technician,
+      });
     }
 
-    log.completed = true;
-    setLogs(updatedLogs);
-    // ✅ Mark machine as Healthy once task is completed
-setMachines((prev) =>
-  prev.map((m) =>
-    m.name === log.machine ? { ...m, status: "Healthy" } : m
-  )
-);
-    // Free technician
-    if (freeTechnician) {
-      freeTechnician(log.techId);
-    }
+    // ✅ Update log in DB (mark completed + save parts used)
+    await axios.put(`http://localhost:5000/api/logs/${selectedLog.id}`, {
+      completed: 1,
+      parts_used: updatedPartUsage,
+    });
+
+    // ✅ Update logs locally
+    setLogs((prev) =>
+      prev.map((log) =>
+        log.id === selectedLog.id
+          ? { ...log, completed: 1, parts_used: updatedPartUsage }
+          : log
+      )
+    );
+
+    // ✅ Mark machine as Healthy
+    setMachines((prev) =>
+      prev.map((m) =>
+        m.name === selectedLog.machine ? { ...m, status: "Healthy" } : m
+      )
+    );
+
+    // ✅ Free technician
+    if (freeTechnician) freeTechnician(selectedLog.tech_id);
 
     // Reset modal state
     setShowModal(false);
     setSelectedPart("");
     setQuantity(1);
-    setModalError(""); // clear modal error on close
-  };
+    setModalError("");
+  } catch (err) {
+    console.error("Error completing log:", err);
+    setModalError("⚠️ Something went wrong while updating. Please try again.");
+  }
+};
+
 
   return (
     <div className="logs-page">
@@ -137,17 +172,18 @@ setMachines((prev) =>
       {lowStockAlert && <Alert variant="danger">{lowStockAlert}</Alert>}
       {supplierAlert && <Alert variant="warning">{supplierAlert}</Alert>}
       {errorAlert && <Alert variant="danger">{errorAlert}</Alert>}
-      
+
+      {/* 🔍 Filter */}
       <Form.Select
-  value={logFilter}
-  onChange={(e) => setLogFilter(e.target.value)}
-  className="mb-3"
-  style={{ width: "250px" }}
->
-  <option value="All">All Logs</option>
-  <option value="Completed">Completed Tasks</option>
-  <option value="InProgress">In Progress</option>
-</Form.Select>
+        value={logFilter}
+        onChange={(e) => setLogFilter(e.target.value)}
+        className="mb-3"
+        style={{ width: "250px" }}
+      >
+        <option value="All">All Logs</option>
+        <option value="Completed">Completed Tasks</option>
+        <option value="InProgress">In Progress</option>
+      </Form.Select>
 
       {logs.length > 0 ? (
         <Table striped bordered hover>
@@ -164,38 +200,38 @@ setMachines((prev) =>
           </thead>
           <tbody>
             {logs
-  .filter((log) => {
-    if (logFilter === "Completed") return log.completed;
-    if (logFilter === "InProgress") return !log.completed;
-    return true; // All
-  })
-  .map((log, index) => (
-              <tr key={index}>
-                <td>{log.machine}</td>
-                <td>{log.technician}</td>
-                <td>{log.skill}</td>
-                <td>{log.date}</td>
-                <td>{log.partsUsed || "—"}</td>
-                <td>
-                  {log.completed ? (
-                    <Badge bg="success">Completed</Badge>
-                  ) : (
-                    <Badge bg="warning">In Progress</Badge>
-                  )}
-                </td>
-                <td>
-                  {!log.completed && (
-                    <Button
-                      variant="success"
-                      size="sm"
-                      onClick={() => handleCompleteClick(index)}
-                    >
-                      Mark Complete
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
+              .filter((log) => {
+                if (logFilter === "Completed") return log.completed;
+                if (logFilter === "InProgress") return !log.completed;
+                return true;
+              })
+              .map((log) => (
+                <tr key={log.id}>
+                  <td>{log.machine}</td>
+                  <td>{log.technician}</td>
+                  <td>{log.skill}</td>
+                  <td>{new Date(log.date_time).toLocaleString()}</td>
+                  <td>{log.parts_used || "—"}</td>
+                  <td>
+                    {log.completed ? (
+                      <Badge bg="success">Completed</Badge>
+                    ) : (
+                      <Badge bg="warning">In Progress</Badge>
+                    )}
+                  </td>
+                  <td>
+                    {!log.completed && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={() => handleCompleteClick(log)}
+                      >
+                        Mark Complete
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </Table>
       ) : (
@@ -208,8 +244,7 @@ setMachines((prev) =>
           <Modal.Title>Parts Used</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          {modalError && <Alert variant="danger">{modalError}</Alert>}{" "}
-          {/* inline error in modal */}
+          {modalError && <Alert variant="danger">{modalError}</Alert>}
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Select Part</Form.Label>
@@ -217,7 +252,7 @@ setMachines((prev) =>
                 value={selectedPart}
                 onChange={(e) => {
                   setSelectedPart(e.target.value);
-                  setModalError(""); // reset error on change
+                  setModalError("");
                 }}
               >
                 <option value="">-- None --</option>
@@ -253,7 +288,7 @@ setMachines((prev) =>
           <Button
             variant="primary"
             onClick={handleCompleteConfirm}
-            disabled={!selectedPart || !quantity || quantity <= 0} 
+            disabled={!selectedPart || !quantity || quantity <= 0}
           >
             Confirm & Complete
           </Button>
