@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect  } from "react";
 import { Table, Button, Modal, Form, Badge, Alert } from "react-bootstrap";
 import axios from "axios";
 import "./Inventory.css";
@@ -18,14 +18,6 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
   });
   const [filter, setFilter] = useState("All");
 
-  // ✅ Fetch inventory from backend (already camelCase)
-  useEffect(() => {
-    axios
-      .get("http://localhost:5000/api/inventory")
-      .then((res) => setInventory(res.data))
-      .catch((err) => console.error("Error fetching inventory:", err));
-  }, [setInventory]);
-
   // 🔎 filter items
   const filteredItems =
     filter === "All"
@@ -38,64 +30,114 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
     setNewItem((prev) => ({ ...prev, [name]: value }));
   };
 
-  // ➕ History log
-  const addHistory = (action, itemName, qtyChange, user = "Admin") => {
-    const entry = {
+  // ➕ Add history log (frontend + backend)
+const addHistory = async (action, itemName, qtyChange, user = "Admin") => {
+  // Ensure qtyChange is numeric
+  const qtyNumber = Number(qtyChange) || 0;
+
+  // Create frontend entry
+  const entry = {
+    action,
+    item: itemName,
+    qtyChange: qtyNumber,
+    user,
+    date: new Date().toISOString().replace("T", " ").slice(0, 19),
+  };
+
+  // Update frontend immediately
+  setStockHistory((prev) => [...prev, entry]);
+
+  // Send to backend
+  try {
+    const payload = {
       action,
       item: itemName,
-      qtyChange,
+      qty_change: qtyNumber, // always numeric
       user,
-      date: new Date().toLocaleString(),
     };
-    setStockHistory((prev) => [...prev, entry]);
-  };
+
+    const res = await axios.post(
+      "http://localhost:5000/api/stock-history",
+      payload
+    );
+
+    // Optional: sync with backend response
+    setStockHistory((prev) =>
+      prev.map((h) =>
+        h.date === entry.date
+          ? { ...h, id: res.data.id, qtyChange: res.data.qty_change }
+          : h
+      )
+    );
+  } catch (err) {
+    console.error("Failed to save stock history:", err);
+    // Optional: remove the frontend entry if backend fails
+    setStockHistory((prev) =>
+      prev.filter((h) => h.date !== entry.date)
+    );
+    alert("Failed to save stock history. Check backend.");
+  }
+};
 
   // ✅ Restock handler
-  const handleRestockConfirm = async () => {
-    if (!restockItem || restockQty <= 0) return;
+const handleRestockConfirm = async () => {
+  const qtyToAdd = Number(restockQty);
+  if (!restockItem || qtyToAdd <= 0) return; // prevent zero
 
-    try {
-      const res = await axios.put(
-        `http://localhost:5000/api/inventory/${restockItem.id}`,
-        { ...restockItem, quantity: restockItem.quantity + parseInt(restockQty) }
-      );
+  try {
+    const newQty = restockItem.quantity + qtyToAdd;
 
-      setInventory((prev) =>
-        prev.map((i) => (i.id === restockItem.id ? res.data : i))
-      );
+    const res = await axios.put(
+      `http://localhost:5000/api/inventory/${restockItem.id}`,
+      { quantity: newQty }
+    );
 
-      addHistory("Restocked", restockItem.name, `+${restockQty}`);
-    } catch (error) {
-      console.error("Error updating stock:", error);
-    }
+    setInventory((prev) =>
+      prev.map((i) =>
+        i.id === restockItem.id ? { ...i, quantity: Number(res.data.quantity) } : i
+      )
+    );
 
-    setRestockModal(false);
-    setRestockItem(null);
-    setRestockQty(0);
-  };
+    await addHistory("Restocked", restockItem.name, Number(restockQty));
+  } catch (error) {
+    console.error("Error updating stock:", error);
+    alert("Failed to restock item. Check backend.");
+  }
+
+  setRestockModal(false);
+  setRestockItem(null);
+  setRestockQty(0);
+};
+
+
+
 
   // ✅ Add item
-  const handleAddItem = async () => {
-    if (!newItem.name || !newItem.quantity) return;
+const handleAddItem = async () => {
+  if (!newItem.name || !newItem.quantity) return;
 
-    try {
-      const res = await axios.post("http://localhost:5000/api/inventory", newItem);
-      setInventory((prev) => [...prev, res.data]);
-      addHistory("Added", res.data.name, `+${res.data.quantity}`);
-    } catch (error) {
-      console.error("Error adding item:", error);
-    }
+  try {
+    const payload = { ...newItem, quantity: Number(newItem.quantity) };
+    const res = await axios.post("http://localhost:5000/api/inventory", payload);
 
-    setNewItem({
-      name: "",
-      category: "Spare Parts",
-      quantity: 0,
-      supplier: "",
-      leadTime: "",
-      expiry: "",
-    });
-    setShowModal(false);
-  };
+    setInventory((prev) => [...prev, res.data]);
+await addHistory("Added", res.data.name, res.data.quantity);
+  } catch (error) {
+    console.error("Error adding item:", error);
+    alert("Failed to add item. Check backend.");
+  }
+
+  setNewItem({
+    name: "",
+    category: "Spare Parts",
+    quantity: 0,
+    supplier: "",
+    leadTime: "",
+    expiry: "",
+  });
+  setShowModal(false);
+};
+
 
   // ✅ Delete item
   const handleDelete = async (id) => {
@@ -104,9 +146,12 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
     try {
       await axios.delete(`http://localhost:5000/api/inventory/${id}`);
       setInventory((prev) => prev.filter((i) => i.id !== id));
-      if (deletedItem) addHistory("Deleted", deletedItem.name, deletedItem.quantity);
+      if (deletedItem)
+  addHistory("Deleted", deletedItem.name, -deletedItem.quantity); // negative qty change
+
     } catch (error) {
       console.error("Error deleting item:", error);
+      alert("Failed to delete item. Check backend.");
     }
   };
 
@@ -118,6 +163,31 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
         i.leadTime || "N/A"
       } days)`
   );
+
+  // ✅ Load stock history when page loads
+useEffect(() => {
+  const fetchHistory = async () => {
+    try {
+      const res = await axios.get("http://localhost:5000/api/stock-history");
+
+      if (res.data && Array.isArray(res.data)) {
+        // Map to ensure qtyChange is numeric
+        const mappedHistory = res.data.map((record) => ({
+          ...record,
+          qtyChange: parseInt(record.qtyChange ?? record.qty_change, 10) || 0,
+        }));
+        setStockHistory(mappedHistory);
+      } else {
+        setStockHistory([]);
+      }
+    } catch (err) {
+      console.error("Error fetching stock history:", err);
+      setStockHistory([]);
+    }
+  };
+
+  fetchHistory();
+}, []);
 
   return (
     <div className="inventory-page">
@@ -220,17 +290,18 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
             <th>Date & Time</th>
           </tr>
         </thead>
-        <tbody>
-          {stockHistory.map((h, index) => (
-            <tr key={index}>
-              <td>{h.action}</td>
-              <td>{h.item}</td>
-              <td>{h.qtyChange}</td>
-              <td>{h.user}</td>
-              <td>{h.date}</td>
-            </tr>
-          ))}
-        </tbody>
+       <tbody>
+  {stockHistory.map((h, index) => (
+    <tr key={index}>
+      <td>{h.action}</td>
+      <td>{h.item}</td>
+      <td>{isNaN(h.qtyChange) ? 0 : h.qtyChange}</td>
+      <td>{h.user}</td>
+      <td>{h.date}</td>
+    </tr>
+  ))}
+</tbody>
+
       </Table>
 
       {/* Add Item Modal */}
@@ -253,7 +324,11 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
 
             <Form.Group className="mb-3">
               <Form.Label>Category</Form.Label>
-              <Form.Select name="category" value={newItem.category} onChange={handleChange}>
+              <Form.Select
+                name="category"
+                value={newItem.category}
+                onChange={handleChange}
+              >
                 <option>Spare Parts</option>
                 <option>Raw Materials</option>
                 <option>Maintenance Supplies</option>
@@ -321,11 +396,12 @@ function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
             <Form.Group>
               <Form.Label>Quantity to Add</Form.Label>
               <Form.Control
-                type="number"
-                value={restockQty}
-                onChange={(e) => setRestockQty(Number(e.target.value))}
-                min={1}
-              />
+  type="number"
+  value={restockQty}
+  onChange={(e) => setRestockQty(e.target.value)}
+  min={1}
+/>
+
             </Form.Group>
           </Form>
         </Modal.Body>

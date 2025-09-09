@@ -17,7 +17,7 @@ function MaintenanceLogs({
   const [showAlert, setShowAlert] = useState(false);
   const [lowStockAlert, setLowStockAlert] = useState("");
   const [supplierAlert, setSupplierAlert] = useState("");
-  const [errorAlert, setErrorAlert] = useState(""); 
+  const [errorAlert, setErrorAlert] = useState("");
   const [modalError, setModalError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [selectedLog, setSelectedLog] = useState(null);
@@ -25,7 +25,7 @@ function MaintenanceLogs({
   const [quantity, setQuantity] = useState(1);
   const [logFilter, setLogFilter] = useState("All");
 
-  // ✅ Fetch logs from backend
+  // Fetch logs from backend
   useEffect(() => {
     axios
       .get("http://localhost:5000/api/logs")
@@ -33,7 +33,7 @@ function MaintenanceLogs({
       .catch((err) => console.error("Logs fetch error:", err));
   }, [setLogs]);
 
-  // ✅ Show "new log added" success alert
+  // Success alert for new logs
   useEffect(() => {
     if (logs.length > 0) {
       setShowAlert(true);
@@ -42,7 +42,7 @@ function MaintenanceLogs({
     }
   }, [logs]);
 
-  // ✅ Auto-hide errorAlert
+  // Auto-hide error alert
   useEffect(() => {
     if (errorAlert) {
       const timer = setTimeout(() => setErrorAlert(""), 3000);
@@ -50,130 +50,140 @@ function MaintenanceLogs({
     }
   }, [errorAlert]);
 
-  // Open modal before marking complete
+  // Open modal to mark complete
   const handleCompleteClick = (log) => {
     setSelectedLog(log);
     setShowModal(true);
     setModalError("");
   };
 
-// Finalize completion and deduct inventory
-const handleCompleteConfirm = async () => {
-  if (!selectedLog) return;
+  // Confirm completion & deduct inventory
+  const handleCompleteConfirm = async () => {
+    if (!selectedLog) return;
 
-  let updatedPartUsage = "";
+    let updatedPartUsage = "";
 
-  try {
-    if (selectedPart) {
-      const selectedItem = inventory.find((i) => i.name === selectedPart);
-      if (!selectedItem) return;
+    try {
+      if (selectedPart) {
+        const selectedItem = inventory.find((i) => i.name === selectedPart);
+        if (!selectedItem) return;
 
-      if (quantity > selectedItem.quantity) {
-        const msg = `❌ Invalid! You cannot use ${quantity} units. Only ${selectedItem.quantity} available.`;
-        setModalError(msg);
-        setErrorAlert(
-          `⚠️ ${selectedLog.technician} tried to use ${quantity}x ${selectedItem.name}, but only ${selectedItem.quantity} left.`
+        if (quantity > selectedItem.quantity) {
+          const msg = `❌ Invalid! You cannot use ${quantity} units. Only ${selectedItem.quantity} available.`;
+          setModalError(msg);
+          setErrorAlert(
+            `⚠️ ${selectedLog.technician} tried to use ${quantity}x ${selectedItem.name}, but only ${selectedItem.quantity} left.`
+          );
+          return;
+        }
+
+        const newQty = Math.max(selectedItem.quantity - quantity, 0);
+
+        if (newQty <= 5) {
+          setLowStockAlert(
+            `⚠️ Low Stock: ${selectedItem.name} has only ${newQty} left!`
+          );
+          setSupplierAlert(
+            `👉 Order ${selectedItem.name} from ${
+              selectedItem.supplier || "Supplier"
+            } (Lead Time: ${selectedItem.lead_time || "N/A"} days)`
+          );
+        }
+
+        // Update inventory locally
+        setInventory((prev) =>
+          prev.map((item) =>
+            item.id === selectedItem.id ? { ...item, quantity: newQty } : item
+          )
         );
-        return;
+
+        // Add stock history locally
+        setStockHistory((prev) => [
+          ...prev,
+          {
+            action: "Used",
+            item: selectedItem.name,
+            qtyChange: `-${quantity}`,
+            user: selectedLog.technician,
+            date: new Date().toLocaleString(),
+          },
+        ]);
+
+        updatedPartUsage = `${quantity} x ${selectedItem.name}`;
+
+        // Update inventory in backend
+        await axios.put(
+          `http://localhost:5000/api/inventory/${selectedItem.id}`,
+          { quantity: newQty }
+        );
+
+        // Add stock history in backend
+        await axios.post(`http://localhost:5000/api/stock-history`, {
+          action: "Used",
+          item: selectedItem.name,
+          qty_change: -quantity,
+          user: selectedLog.technician,
+        });
       }
 
-      const newQty = Math.max(selectedItem.quantity - quantity, 0);
+      // Update log in backend
+      await axios.put(`http://localhost:5000/api/logs/${selectedLog.id}`, {
+        completed: 1,
+        parts_used: updatedPartUsage,
+      });
 
-      if (newQty <= 5) {
-        setLowStockAlert(
-          `⚠️ Low Stock: ${selectedItem.name} has only ${newQty} left!`
-        );
-        setSupplierAlert(
-          `👉 Order ${selectedItem.name} from ${
-            selectedItem.supplier || "Supplier"
-          } (Lead Time: ${selectedItem.lead_time || "N/A"} days)`
-        );
-      }
+      // Update machine status in backend
+await axios.put(`http://localhost:5000/api/machines/${selectedLog.machine_id}`, {
+  status: "Healthy",
+});
 
-      // ✅ Update inventory locally
-      setInventory((prev) =>
-        prev.map((item) =>
-          item.id === selectedItem.id ? { ...item, quantity: newQty } : item
+// Free technician in backend
+await axios.post(`http://localhost:5000/api/machines/${selectedLog.machine_id}/unassign`, {
+  techId: selectedLog.tech_id,
+});
+
+      // Update logs locally
+      setLogs((prev) =>
+        prev.map((log) =>
+          log.id === selectedLog.id
+            ? { ...log, completed: 1, parts_used: updatedPartUsage }
+            : log
         )
       );
 
-      // ✅ Add stock history (frontend)
-      setStockHistory((prev) => [
-        ...prev,
-        {
-          action: "Used",
-          item: selectedItem.name,
-          qtyChange: `-${quantity}`,
-          user: selectedLog.technician,
-          date: new Date().toLocaleString(),
-        },
-      ]);
+      // Update machine status
+      setMachines((prev) =>
+        prev.map((m) =>
+          m.name === selectedLog.machine ? { ...m, status: "Healthy" } : m
+        )
+      );
 
-      updatedPartUsage = `${quantity} x ${selectedItem.name}`;
+      // Free technician
+      if (freeTechnician) freeTechnician(selectedLog.tech_id);
 
-      // ✅ Update inventory in DB
-      await axios.put(`http://localhost:5000/api/inventory/${selectedItem.id}`, {
-        quantity: newQty,
-      });
-
-      // ✅ Add stock history in DB
-      await axios.post(`http://localhost:5000/api/stock-history`, {
-        action: "Used",
-        item: selectedItem.name,
-        qty_change: -quantity,
-        user: selectedLog.technician,
-      });
+      // Reset modal state
+      setShowModal(false);
+      setSelectedPart("");
+      setQuantity(1);
+      setModalError("");
+    } catch (err) {
+      console.error("Error completing log:", err);
+      setModalError(
+        "⚠️ Something went wrong while updating. Please try again."
+      );
     }
-
-    // ✅ Update log in DB (mark completed + save parts used)
-    await axios.put(`http://localhost:5000/api/logs/${selectedLog.id}`, {
-      completed: 1,
-      parts_used: updatedPartUsage,
-    });
-
-    // ✅ Update logs locally
-    setLogs((prev) =>
-      prev.map((log) =>
-        log.id === selectedLog.id
-          ? { ...log, completed: 1, parts_used: updatedPartUsage }
-          : log
-      )
-    );
-
-    // ✅ Mark machine as Healthy
-    setMachines((prev) =>
-      prev.map((m) =>
-        m.name === selectedLog.machine ? { ...m, status: "Healthy" } : m
-      )
-    );
-
-    // ✅ Free technician
-    if (freeTechnician) freeTechnician(selectedLog.tech_id);
-
-    // Reset modal state
-    setShowModal(false);
-    setSelectedPart("");
-    setQuantity(1);
-    setModalError("");
-  } catch (err) {
-    console.error("Error completing log:", err);
-    setModalError("⚠️ Something went wrong while updating. Please try again.");
-  }
-};
-
+  };
 
   return (
     <div className="logs-page">
       <h2 className="mb-4">Maintenance Logs</h2>
 
-      {showAlert && (
-        <Alert variant="success">✅ New log added successfully!</Alert>
-      )}
+      {showAlert && <Alert variant="success">✅ New log added successfully!</Alert>}
       {lowStockAlert && <Alert variant="danger">{lowStockAlert}</Alert>}
       {supplierAlert && <Alert variant="warning">{supplierAlert}</Alert>}
       {errorAlert && <Alert variant="danger">{errorAlert}</Alert>}
 
-      {/* 🔍 Filter */}
+      {/* Filter */}
       <Form.Select
         value={logFilter}
         onChange={(e) => setLogFilter(e.target.value)}

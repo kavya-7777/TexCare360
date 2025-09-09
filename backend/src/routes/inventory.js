@@ -56,31 +56,39 @@ router.put("/:id", async (req, res) => {
   const { name, category, quantity, supplier, leadTime, expiry } = req.body;
 
   try {
+    const [current] = await pool.query("SELECT * FROM inventory WHERE id=?", [id]);
+    if (!current[0]) return res.status(404).json({ error: "Item not found" });
+
+    const updated = {
+      name: name ?? current[0].name,
+      category: category ?? current[0].category,
+quantity: quantity !== undefined ? Number(quantity) : current[0].quantity,
+      supplier: supplier ?? current[0].supplier,
+leadTime: leadTime !== undefined ? Number(leadTime) : current[0].lead_time,
+      expiry: expiry ?? current[0].expiry,
+    };
+
     const sql = `UPDATE inventory 
                  SET name=?, category=?, quantity=?, supplier=?, lead_time=?, expiry=?
                  WHERE id=?`;
-    const [result] = await pool.query(sql, [name, category, quantity, supplier, leadTime, expiry, id]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: "Item not found" });
-    }
+    const [result] = await pool.query(sql, [
+      updated.name,
+      updated.category,
+      updated.quantity,
+      updated.supplier,
+      updated.leadTime,
+      updated.expiry,
+      id,
+    ]);
 
-    res.json(
-      toCamel({
-        id,
-        name,
-        category,
-        quantity,
-        supplier,
-        lead_time: leadTime,
-        expiry,
-      })
-    );
+    res.json(toCamel({ id, ...updated }));
   } catch (err) {
     console.error(err);
     res.status(500).send("Server Error");
   }
 });
+
 
 // 🗑️ Delete inventory item
 router.delete("/:id", async (req, res) => {
