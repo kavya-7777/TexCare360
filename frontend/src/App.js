@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import NavigationBar from "./components/NavigationBar/NavigationBar";
+import { Routes, Route, Navigate} from "react-router-dom";import NavigationBar from "./components/NavigationBar/NavigationBar";
+import Login from "./pages/Auth/Login";
+import Signup from "./pages/Auth/Signup";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Machines from "./pages/Machines/Machines";
 import Technicians from "./pages/Technicians/Technicians";
@@ -8,8 +9,12 @@ import MaintenanceLogs from "./pages/MaintenanceLogs/MaintenanceLogs";
 import Inventory from "./pages/Inventory/Inventory";
 import { Container } from "react-bootstrap";
 import axios from "axios";
+import ProtectedRoute from "./components/ProtectedRoute";
+import { useAuth } from "./context/AuthContext";
+
 
 function App() {
+  const {loading } = useAuth();
   const [machines, setMachines] = useState([]);
   const [logs, setLogs] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -206,72 +211,91 @@ const addStockHistory = async (entry) => {
     }
   };
 
+  if (loading) return (
+    <div className="d-flex justify-content-center align-items-center" style={{ height: "100vh" }}>
+      <div className="spinner-border text-primary" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>
+  );
+
   return (
-    <Router>
+     <>
       <NavigationBar />
       <Container className="mt-5 pt-5">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route
-            path="/machines"
-            element={
-              <Machines
-                machines={machines}
-                setMachines={setMachines}
-                assignTechnician={assignTechnician}
-                technicians={technicians}
-                logs={logs}
-                setLogs={setLogs}
-              />
-            }
-          />
-          <Route
-            path="/technicians"
-            element={
-              <Technicians
-                technicians={technicians}
-                setTechnicians={setTechnicians}
-              />
-            }
-          />
-          <Route
-            path="/maintenance-logs"
-            element={
-              <MaintenanceLogs
-                logs={logs}
-                setLogs={setLogs}
-                freeTechnician={freeTechnician}
-                machines={machines}
-                setMachines={setMachines}
-                inventory={inventory}
-                setInventory={setInventory}
-                stockHistory={stockHistory}
-                setStockHistory={setStockHistory}
-              />
-            }
-          />
-          <Route
-            path="/inventory"
-            element={
-              <Inventory
-                inventory={inventory}
-                setInventory={setInventory}
-                logs={logs}
-                setLogs={setLogs}
-                stockHistory={stockHistory}
-                setStockHistory={setStockHistory}
-                machines={machines}
-                setMachines={setMachines}
-                addInventoryItem={addInventoryItem}
-                updateInventoryItem={updateInventoryItem}
-                deleteInventoryItem={deleteInventoryItem}
-                addStockHistory={addStockHistory}
-              />
-            }
-          />
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+
+          <Route path="/" element={<Navigate to="/dashboard" />} />
+
+          {/* ✅ Protected routes (requires user login) */}
+          <Route element={<ProtectedRoute />}>
+            
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route
+              path="/machines"
+              element={
+                <Machines
+                  machines={machines}
+                  setMachines={setMachines}
+                  assignTechnician={assignTechnician}
+                  technicians={technicians}
+                  logs={logs}
+                  setLogs={setLogs}
+                />
+              }
+            />
+            <Route
+              path="/technicians"
+              element={
+                <Technicians
+                  technicians={technicians}
+                  setTechnicians={setTechnicians}
+                />
+              }
+            />
+            <Route
+              path="/maintenance-logs"
+              element={
+                <MaintenanceLogs
+                  logs={logs}
+                  setLogs={setLogs}
+                  freeTechnician={freeTechnician}
+                  machines={machines}
+                  setMachines={setMachines}
+                  inventory={inventory}
+                  setInventory={setInventory}
+                  stockHistory={stockHistory}
+                  setStockHistory={setStockHistory}
+                />
+              }
+            />
+            <Route
+              path="/inventory"
+              element={
+                <Inventory
+                  inventory={inventory}
+                  setInventory={setInventory}
+                  logs={logs}
+                  setLogs={setLogs}
+                  stockHistory={stockHistory}
+                  setStockHistory={setStockHistory}
+                  machines={machines}
+                  setMachines={setMachines}
+                  addInventoryItem={addInventoryItem}
+                  updateInventoryItem={updateInventoryItem}
+                  deleteInventoryItem={deleteInventoryItem}
+                  addStockHistory={addStockHistory}
+                />
+              }
+            />
+          </Route>
+          <Route path="*" element={<Login />} />
         </Routes>
       </Container>
-    </Router>
+    </>  
   );
 }
 

@@ -1,7 +1,9 @@
+// backend/server.js
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 require("dotenv").config();
-const pool = require("./db");   // ✅ correct
+const pool = require("./db");   // existing db helper
 
 const machinesRouter = require("./routes/machines");
 const inventoryRouter = require("./routes/inventory");
@@ -9,11 +11,21 @@ const techniciansRouter = require("./routes/technicians");
 const logsRouter = require("./routes/logs");
 const stockHistoryRoutes = require("./routes/stockHistory");
 
-const app = express();
-app.use(cors({ origin: "http://localhost:3000" }));
-app.use(express.json());
+// new auth router
+const authRouter = require("./routes/auth");
 
-// health check
+const app = express();
+
+// CORS: allow credentials and your frontend origin
+app.use(cors({
+  origin: "http://localhost:3000",
+  credentials: true
+}));
+
+app.use(express.json());
+app.use(cookieParser()); // added for cookies
+
+// health check (kept as-is)
 app.get("/api/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");
@@ -23,6 +35,10 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
+// mount auth router
+app.use("/api/auth", authRouter);
+
+// existing routers (kept)
 app.use("/api/machines", machinesRouter);
 app.use("/api/inventory", inventoryRouter);
 app.use("/api/technicians", techniciansRouter);
