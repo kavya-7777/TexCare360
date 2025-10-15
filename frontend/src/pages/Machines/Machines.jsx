@@ -7,6 +7,55 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
   const [showModal, setShowModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
 
+  // AUTO-ASSIGN: runs automatically in background
+  useEffect(() => {
+    const autoAssignMachines = async () => {
+      for (const machine of machines) {
+        if (machine.status === "Unhealthy") {
+          const assignedTech = getAssignedTechnician(machine.name);
+          if (!assignedTech) {
+            const skillRequired = machine.required_skill || "Mechanical";
+            const availableTech = technicians.find(
+              (t) => t.status === "Available" && t.skill === skillRequired
+            );
+
+            if (availableTech) {
+              // Update technician status locally
+              setTechnicians((prev) =>
+                prev.map((t) =>
+                  t.id === availableTech.id ? { ...t, status: "Busy" } : t
+                )
+              );
+
+              // Add log
+              const newLog = {
+                machine: machine.name,
+                technician: availableTech.name,
+                skill: availableTech.skill,
+                techId: availableTech.id,
+                date_time: new Date().toISOString().slice(0, 19).replace("T", " "),
+                completed: false,
+              };
+              setLogs((prev) => [...prev, newLog]);
+
+              // Update backend
+              await axios.post("http://localhost:5000/api/logs", newLog);
+              await axios.put(
+                `http://localhost:5000/api/technicians/${availableTech.id}/status`,
+                { status: "Busy" }
+              );
+            }
+            // ❌ DO NOT open modal automatically
+          }
+        }
+      }
+    };
+
+    if (technicians.length > 0) {
+      autoAssignMachines();
+    }
+  }, [machines]); // only runs when machines change
+
   // Fetch machines on mount
   useEffect(() => {
     axios
@@ -21,12 +70,11 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
     setShowModal(true);
   };
 
-  // Assign technician
+  // Assign technician manually from modal
   const handleAssignTechnician = async (machine, technician) => {
     try {
       if (!machine || !technician) return;
 
-      // 1️⃣ Optimistically update logs
       const newLog = {
         machine: machine.name,
         technician: technician.name,
@@ -37,18 +85,15 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
       };
       setLogs((prev) => [...prev, newLog]);
 
-      // 2️⃣ Optimistically update technician status locally
       setTechnicians((prev) =>
         prev.map((t) =>
           t.id === technician.id ? { ...t, status: "Busy" } : t
         )
       );
 
-      // 3️⃣ Close modal
       setShowModal(false);
       setSelectedMachine(null);
 
-      // 4️⃣ Update backend asynchronously
       await axios.post("http://localhost:5000/api/logs", newLog);
       await axios.put(
         `http://localhost:5000/api/technicians/${technician.id}/status`,
@@ -80,6 +125,7 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
             <th>Machine ID</th>
             <th>Machine Name</th>
             <th>Status</th>
+            <th>Required Skill</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -97,19 +143,22 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
                     <Badge bg="danger">Unhealthy</Badge>
                   )}
                 </td>
+                <td>{machine.required_skill || "Mechanical"}</td>
                 <td>
                   {assignedTech ? (
                     <span>
                       Assigned to <strong>{assignedTech.name}</strong>
                     </span>
                   ) : machine.status === "Unhealthy" ? (
-                    <Button
-                      variant="warning"
-                      size="sm"
-                      onClick={() => handleAssignClick(machine)}
-                    >
-                      Assign Technician
-                    </Button>
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="warning"
+                        size="sm"
+                        onClick={() => handleAssignClick(machine)}
+                      >
+                        Auto Assign Technician
+                      </Button>
+                    </div>
                   ) : (
                     <span>—</span>
                   )}
@@ -124,33 +173,36 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>
           <Modal.Title>
-            Assign Technician for {selectedMachine?.name}
+            Assign Technician for {selectedMachine?.name} (Required Skill: {selectedMachine?.required_skill || "Mechanical"})
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <h5>Available Technicians</h5>
           {getAvailableTechnicians().length > 0 ? (
-            getAvailableTechnicians().map((tech) => (
-              <div
-                key={tech.id}
-                className="d-flex justify-content-between align-items-center mb-2"
-              >
-                <span>
-                  {tech.name} ({tech.skill}) <Badge bg="success">Available</Badge>
-                </span>
-                <Button
-    variant="primary"
-    size="sm"
-    onClick={() => assignTechnician(tech.id, selectedMachine.name, tech.skill, () => {
-        setShowModal(false);
-        setSelectedMachine(null);
-    })}
->
-    Assign
-</Button>
-
-              </div>
-            ))
+            getAvailableTechnicians().map((tech) => {
+              const matchesSkill =
+                tech.skill === (selectedMachine?.required_skill || "Mechanical");
+              return (
+                <div
+                  key={tech.id}
+                  className="d-flex justify-content-between align-items-center mb-2"
+                >
+                  <span>
+                    {tech.name} ({tech.skill}){" "}
+                    <Badge bg={matchesSkill ? "success" : "secondary"}>
+                      {matchesSkill ? "Matches Skill" : "Available"}
+                    </Badge>
+                  </span>
+                  <Button
+                    variant={matchesSkill ? "primary" : "outline-primary"}
+                    size="sm"
+                    onClick={() => handleAssignTechnician(selectedMachine, tech)}
+                  >
+                    Assign
+                  </Button>
+                </div>
+              );
+            })
           ) : (
             <p>No available technicians right now.</p>
           )}

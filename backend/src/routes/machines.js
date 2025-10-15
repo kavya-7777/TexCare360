@@ -9,7 +9,7 @@ const pool = require("../db");
 router.get("/", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      "SELECT id, name, status, created_at AS createdAt FROM machines ORDER BY id"
+      "SELECT id, name, status, required_skill, created_at AS createdAt FROM machines ORDER BY id"
     );
     res.json(rows);
   } catch (err) {
@@ -25,7 +25,7 @@ router.get("/:id", async (req, res) => {
   const id = req.params.id;
   try {
     const [rows] = await pool.query(
-      "SELECT id, name, status, created_at AS createdAt FROM machines WHERE id = ?",
+      "SELECT id, name, status, required_skill, created_at AS createdAt FROM machines WHERE id = ?",
       [id]
     );
     if (rows.length === 0)
@@ -168,5 +168,50 @@ router.post("/:id/unassign", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+/**
+ * POST /api/machines/:id/auto-assign
+ * Auto-assign a technician based on availability and skill
+ */
+router.post("/:id/auto-assign", async (req, res) => {
+  const machineId = req.params.id;
+  const { skillRequired } = req.body;
+
+  if (!skillRequired) return res.status(400).json({ error: "Missing skillRequired" });
+
+  try {
+    // Try to find technician with required skill
+    const [techRows] = await pool.query(
+  "SELECT * FROM technicians WHERE status = 'Available' AND LOWER(skill) = LOWER(?) LIMIT 1",
+  [skillRequired]
+);
+
+
+    if (techRows.length === 0) {
+      // No technician with required skill → frontend should show manual assign modal
+      return res.json({ technician: null });
+    }
+
+    const technician = techRows[0];
+
+    // Update technician status
+    await pool.query("UPDATE technicians SET status = 'Busy' WHERE id = ?", [technician.id]);
+    // Update machine status
+    await pool.query("UPDATE machines SET status = 'Unhealthy' WHERE id = ?", [machineId]);
+    // Add maintenance log
+    const dateTime = new Date().toISOString().slice(0, 19).replace("T", " ");
+    await pool.query(
+      "INSERT INTO maintenance_logs (machine_id, tech_id, skill, date_time, completed) VALUES (?, ?, ?, ?, 0)",
+      [machineId, technician.id, technician.skill, dateTime]
+    );
+
+    res.json({ technician }); // return assigned technician
+  } catch (err) {
+    console.error("Error in auto-assign:", err);
+    res.status(500).json({ error: "Server error during auto-assign" });
+  }
+});
+
 
 module.exports = router;

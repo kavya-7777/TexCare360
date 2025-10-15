@@ -242,6 +242,7 @@ const addStockHistory = async (entry) => {
                   setMachines={setMachines}
                   assignTechnician={assignTechnician}
                   technicians={technicians}
+                  setTechnicians={setTechnicians}
                   logs={logs}
                   setLogs={setLogs}
                 />
