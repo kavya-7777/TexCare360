@@ -1,3 +1,92 @@
-.machines-page {
-  padding: 20px;
+.machines-container {
+  padding: 2rem;
+  font-family: "Inter", sans-serif;
+  background-color: #f9fafc;
+  min-height: 100vh;
+}
+
+.machines-header {
+  margin-bottom: 2rem;
+}
+
+.machines-header h2 {
+  font-weight: 700;
+  color: #2e3b4e;
+}
+
+.machines-header p {
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.machines-table-container {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.machines-table thead {
+  background-color: #f1f5f9;
+}
+
+.machines-table th {
+  color: #374151;
+  font-weight: 600;
+}
+
+.machines-table td {
+  vertical-align: middle;
+}
+
+.status-badge {
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+}
+
+.machine-name {
+  font-weight: 500;
+}
+
+.assign-btn {
+  transition: all 0.2s ease;
+}
+
+.assign-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(255, 193, 7, 0.4);
+}
+
+/* Modal Styling */
+.tech-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tech-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f9fafc;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  transition: 0.2s ease;
+}
+
+.tech-card:hover {
+  background: #f1f5f9;
+  transform: translateY(-2px);
+}
+
+.tech-info h6 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.tech-info p {
+  margin: 0;
+  font-size: 0.85rem;
 }
