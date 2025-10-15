@@ -150,11 +150,6 @@ export default function Dashboard() {
     ];
   }, [inventory, gaugeThreshold]);
 
-  // Apply dark mode
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
-
   return (
     <div className={`min-h-screen transition-colors ${dark ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
       {/* Header */}
@@ -166,9 +161,6 @@ export default function Dashboard() {
             <div className="text-sm text-gray-500">Operational insights & real-time gauges</div>
           </div>
         </div>
-        <button onClick={() => setDark(d => !d)} className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
-          {dark ? <Sun /> : <Moon />}
-        </button>
       </header>
 
       <main className="max-w-[1600px] mx-auto px-4 py-8 space-y-8">
@@ -194,38 +186,32 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </ChartCard>
 
-          {/* Technician Workload */}
-          <ChartCard
-            title="Technician Workload"
-            controls={(
-              <select value={techSelector} onChange={e => setTechSelector(e.target.value)} className="rounded border px-2 py-1 text-sm">
-                {techOptions.map(opt => <option key={opt.id} value={opt.id}>{opt.name}</option>)}
-              </select>
-            )}
-          >
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={techWorkData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="completed" fill={COLORS.completed} />
-                <Bar dataKey="pending" fill={COLORS.pending} />
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartCard>
+{/* Technician Workload */}
+<ChartCard title="Technician Workload">
+  <ResponsiveContainer width="100%" height={260}>
+    <BarChart
+      data={techWorkData}
+      margin={{ top: 10, right: 30, left: 0, bottom: 30 }} // adds padding at bottom
+    >
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis
+        dataKey="name"
+        angle={-30}
+        textAnchor="end"
+        interval={0}
+        tick={{ fontSize: 12, dy: 10 }} // dy gives vertical spacing between axis and bars
+      />
+      <YAxis />
+      <Tooltip />
+      <Legend verticalAlign="top" height={36} />
+      <Bar dataKey="completed" fill={COLORS.completed} />
+      <Bar dataKey="pending" fill={COLORS.pending} />
+    </BarChart>
+  </ResponsiveContainer>
+</ChartCard>
 
           {/* Maintenance Trend */}
-          <ChartCard
-            title="Maintenance Trend"
-            controls={(
-              <div className="flex gap-2">
-                <input type="date" value={trendFrom} onChange={e => setTrendFrom(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-                <input type="date" value={trendTo} onChange={e => setTrendTo(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-              </div>
-            )}
-          >
+          <ChartCard title="Maintenance Trend">
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={maintenanceTrendData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -238,20 +224,7 @@ export default function Dashboard() {
           </ChartCard>
 
           {/* Inventory Distribution */}
-          <ChartCard
-            title="Inventory by Category"
-            controls={(
-              <div className="flex gap-2">
-                <select value={inventoryCategory} onChange={e => setInventoryCategory(e.target.value)} className="border rounded px-2 py-1 text-sm">
-                  <option value="">All</option>
-                  {categories.map(c => <option key={c}>{c}</option>)}
-                </select>
-                <label className="flex items-center gap-1 text-sm">
-                  <input type="checkbox" checked={showLowStockOnly} onChange={e => setShowLowStockOnly(e.target.checked)} /> Low Stock
-                </label>
-              </div>
-            )}
-          >
+          <ChartCard title="Inventory by Category">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie data={inventoryCategoryData} innerRadius={50} outerRadius={80} label>
