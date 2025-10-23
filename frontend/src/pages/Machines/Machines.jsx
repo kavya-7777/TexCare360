@@ -6,6 +6,12 @@ import "./Machines.css";
 function Machines({ machines, setMachines, technicians, setTechnicians, logs, setLogs, assignTechnician }) {
   const [showModal, setShowModal] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState(null);
+const [showAddModal, setShowAddModal] = useState(false);
+const [newMachine, setNewMachine] = useState({
+  name: "",
+  required_skill: "Mechanical",
+  status: "Healthy",
+});
 
   // AUTO-ASSIGN: runs automatically in background
   useEffect(() => {
@@ -104,6 +110,26 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
     }
   };
 
+// Add new machine to backend and update state
+const handleAddMachine = async () => {
+  try {
+    if (!newMachine.name.trim()) {
+      alert("Please enter a machine name");
+      return;
+    }
+
+    const res = await axios.post("http://localhost:5000/api/machines", newMachine);
+    setMachines((prev) => [...prev, res.data.machine]);
+
+    setNewMachine({ name: "", required_skill: "Mechanical", status: "Healthy" });
+    setShowAddModal(false);
+  } catch (err) {
+    console.error("Error adding machine:", err);
+    alert("Failed to add machine");
+  }
+};
+
+
   // Get technician assigned to a machine
   const getAssignedTechnician = (machineName) =>
     technicians.find(
@@ -118,7 +144,13 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
 
   return (
     <div className="machines-page">
-      <h2 className="mb-4">Machines</h2>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+  <h2 className="mb-0">Machines</h2>
+  <Button variant="success" onClick={() => setShowAddModal(true)}>
+    + Add Machine
+  </Button>
+</div>
+
       <Table striped bordered hover>
         <thead>
           <tr>
@@ -208,6 +240,67 @@ function Machines({ machines, setMachines, technicians, setTechnicians, logs, se
           )}
         </Modal.Body>
       </Modal>
+      {/* Add Machine Modal */}
+<Modal show={showAddModal} onHide={() => setShowAddModal(false)}>
+  <Modal.Header closeButton>
+    <Modal.Title>Add New Machine</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <form>
+      <div className="mb-3">
+        <label className="form-label">Machine Name</label>
+        <input
+          type="text"
+          className="form-control"
+          value={newMachine.name}
+          onChange={(e) =>
+            setNewMachine({ ...newMachine, name: e.target.value })
+          }
+          required
+        />
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label">Required Skill</label>
+        <select
+          className="form-select"
+          value={newMachine.required_skill}
+          onChange={(e) =>
+            setNewMachine({ ...newMachine, required_skill: e.target.value })
+          }
+        >
+          <option value="Mechanical">Mechanical</option>
+          <option value="Electrical">Electrical</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Designer">Designer</option>
+        </select>
+      </div>
+
+      <div className="mb-3">
+        <label className="form-label">Status</label>
+        <select
+          className="form-select"
+          value={newMachine.status}
+          onChange={(e) =>
+            setNewMachine({ ...newMachine, status: e.target.value })
+          }
+        >
+          <option value="Healthy">Healthy</option>
+          <option value="Unhealthy">Unhealthy</option>
+        </select>
+      </div>
+    </form>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setShowAddModal(false)}>
+      Cancel
+    </Button>
+    <Button variant="primary" onClick={handleAddMachine}>
+      Add Machine
+    </Button>
+  </Modal.Footer>
+</Modal>
+
     </div>
   );
 }

@@ -37,27 +37,59 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// /**
+//  * POST /api/machines
+//  */
+// router.post("/", async (req, res) => {
+//   const { name, status = "Healthy" } = req.body;
+//   if (!name) return res.status(400).json({ error: "Missing machine name" });
+
+//   try {
+//     const [result] = await pool.query(
+//       "INSERT INTO machines (name, status) VALUES (?, ?)",
+//       [name, status]
+//     );
+//     const insertedId = result.insertId;
+//     const [rows] = await pool.query(
+//       "SELECT id, name, status, created_at AS createdAt FROM machines WHERE id = ?",
+//       [insertedId]
+//     );
+//     res.status(201).json(rows[0]);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: err.message });
+//   }
+// });
+
 /**
  * POST /api/machines
+ * Add a new machine
  */
 router.post("/", async (req, res) => {
-  const { name, status = "Healthy" } = req.body;
-  if (!name) return res.status(400).json({ error: "Missing machine name" });
-
   try {
+    const { name, status, required_skill } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Machine name is required" });
+    }
+
     const [result] = await pool.query(
-      "INSERT INTO machines (name, status) VALUES (?, ?)",
-      [name, status]
+      "INSERT INTO machines (name, status, required_skill) VALUES (?, ?, ?)",
+      [name, status || "Healthy", required_skill || "Mechanical"]
     );
-    const insertedId = result.insertId;
-    const [rows] = await pool.query(
-      "SELECT id, name, status, created_at AS createdAt FROM machines WHERE id = ?",
-      [insertedId]
-    );
-    res.status(201).json(rows[0]);
+
+    res.status(201).json({
+      message: "Machine added successfully",
+      machine: {
+        id: result.insertId,
+        name,
+        status: status || "Healthy",
+        required_skill: required_skill || "Mechanical",
+      },
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error("Error adding machine:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -212,6 +244,7 @@ router.post("/:id/auto-assign", async (req, res) => {
     res.status(500).json({ error: "Server error during auto-assign" });
   }
 });
+
 
 
 module.exports = router;

@@ -2,6 +2,7 @@ import React, { useState, useEffect  } from "react";
 import { Table, Button, Modal, Form, Badge, Alert } from "react-bootstrap";
 import axios from "axios";
 import "./Inventory.css";
+import moment from "moment-timezone";
 
 function Inventory({ inventory, setInventory, stockHistory, setStockHistory }) {
   const [showModal, setShowModal] = useState(false);
@@ -37,12 +38,13 @@ const addHistory = async (action, itemName, qtyChange, user = "Admin") => {
 
   // Create frontend entry
   const entry = {
-    action,
-    item: itemName,
-    qtyChange: qtyNumber,
-    user,
-    date: new Date().toISOString().replace("T", " ").slice(0, 19),
-  };
+  action,
+  item: itemName,
+  qtyChange: qtyNumber,
+  user,
+  date: new Date().toISOString()
+};
+
 
   // Update frontend immediately
   setStockHistory((prev) => [...prev, entry]);
@@ -82,23 +84,37 @@ const addHistory = async (action, itemName, qtyChange, user = "Admin") => {
   // ✅ Restock handler
 const handleRestockConfirm = async () => {
   const qtyToAdd = Number(restockQty);
-  if (!restockItem || qtyToAdd <= 0) return; // prevent zero
+  if (!restockItem || qtyToAdd <= 0) return;
 
   try {
-    const newQty = restockItem.quantity + qtyToAdd;
+    const updatedData = {
+      quantity: restockItem.quantity + qtyToAdd,
+    };
+
+    // include new expiry date if user entered it
+    if (restockItem.newExpiry) {
+      updatedData.expiry = restockItem.newExpiry;
+    }
 
     const res = await axios.put(
       `http://localhost:5000/api/inventory/${restockItem.id}`,
-      { quantity: newQty }
+      updatedData
     );
 
+    // update frontend
     setInventory((prev) =>
       prev.map((i) =>
-        i.id === restockItem.id ? { ...i, quantity: Number(res.data.quantity) } : i
+        i.id === restockItem.id
+          ? {
+              ...i,
+              quantity: res.data.quantity,
+              expiry: res.data.expiry || i.expiry,
+            }
+          : i
       )
     );
 
-    await addHistory("Restocked", restockItem.name, Number(restockQty));
+    await addHistory("Restocked", restockItem.name, qtyToAdd);
   } catch (error) {
     console.error("Error updating stock:", error);
     alert("Failed to restock item. Check backend.");
@@ -108,8 +124,6 @@ const handleRestockConfirm = async () => {
   setRestockItem(null);
   setRestockQty(0);
 };
-
-
 
 
   // ✅ Add item
@@ -164,6 +178,23 @@ await addHistory("Added", res.data.name, res.data.quantity);
       } days)`
   );
 
+  // 🚨 Expiry Alerts
+const today = new Date();
+const expiryAlerts = inventory.filter((i) => {
+  if (!i.expiry) return false;
+  const expiryDate = new Date(i.expiry);
+  const diffDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+  return diffDays <= 7; // within 7 days or already expired
+});
+
+const expiryMessages = expiryAlerts.map((i) => {
+  const expiryDate = new Date(i.expiry);
+  const diffDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+  return diffDays < 0
+    ? `${i.name} has already expired on ${expiryDate.toLocaleDateString()}`
+    : `${i.name} will expire in ${diffDays} day(s) (on ${expiryDate.toLocaleDateString()})`;
+});
+
   // ✅ Load stock history when page loads
 useEffect(() => {
   const fetchHistory = async () => {
@@ -217,6 +248,17 @@ useEffect(() => {
         </Alert>
       )}
 
+{expiryAlerts.length > 0 && (
+  <Alert variant="warning">
+    ⚠️ Expiry Alert:
+    <ul className="mb-0">
+      {expiryMessages.map((msg, idx) => (
+        <li key={idx}>{msg}</li>
+      ))}
+    </ul>
+  </Alert>
+)}
+
       <Button variant="primary" className="mb-3" onClick={() => setShowModal(true)}>
         ➕ Add Item
       </Button>
@@ -237,7 +279,17 @@ useEffect(() => {
         </thead>
         <tbody>
           {filteredItems.map((item) => (
-            <tr key={item.id} className={item.quantity <= 5 ? "table-danger" : ""}>
+<tr
+  key={item.id}
+  className={
+    item.quantity <= 5
+      ? "table-danger"
+      : item.expiry &&
+        new Date(item.expiry) - new Date() <= 7 * 24 * 60 * 60 * 1000
+      ? "table-warning"
+      : ""
+  }
+>
               <td>{item.id}</td>
               <td>{item.name}</td>
               <td>{item.category}</td>
@@ -253,7 +305,15 @@ useEffect(() => {
               </td>
               <td>{item.supplier}</td>
               <td>{item.leadTime}</td>
-              <td>{item.expiry || "N/A"}</td>
+<td>
+  {item.expiry
+    ? new Date(item.expiry).toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    : "N/A"}
+</td>
               <td className="d-flex gap-2">
                 <Button
                   variant="warning"
@@ -297,7 +357,7 @@ useEffect(() => {
       <td>{h.item}</td>
       <td>{isNaN(h.qtyChange) ? 0 : h.qtyChange}</td>
       <td>{h.user}</td>
-      <td>{h.date}</td>
+      <td>{moment(h.date).tz("Asia/Kolkata").format("DD MMM YYYY, hh:mm A")}</td>
     </tr>
   ))}
 </tbody>
@@ -386,34 +446,47 @@ useEffect(() => {
         </Modal.Footer>
       </Modal>
 
-      {/* Restock Modal */}
-      <Modal show={restockModal} onHide={() => setRestockModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>Restock {restockItem?.name}</Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group>
-              <Form.Label>Quantity to Add</Form.Label>
-              <Form.Control
-  type="number"
-  value={restockQty}
-  onChange={(e) => setRestockQty(e.target.value)}
-  min={1}
-/>
+{/* Restock Modal */}
+<Modal show={restockModal} onHide={() => setRestockModal(false)}>
+  <Modal.Header closeButton>
+    <Modal.Title>Restock {restockItem?.name}</Modal.Title>
+  </Modal.Header>
+  <Modal.Body>
+    <Form>
+      <Form.Group className="mb-3">
+        <Form.Label>Quantity to Add</Form.Label>
+        <Form.Control
+          type="number"
+          value={restockQty}
+          onChange={(e) => setRestockQty(e.target.value)}
+          min={1}
+        />
+      </Form.Group>
 
-            </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setRestockModal(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={handleRestockConfirm}>
-            Confirm Restock
-          </Button>
-        </Modal.Footer>
-      </Modal>
+      <Form.Group className="mb-3">
+        <Form.Label>New Expiry Date (optional)</Form.Label>
+        <Form.Control
+          type="date"
+          value={restockItem?.newExpiry || ""}
+          onChange={(e) =>
+            setRestockItem((prev) => ({
+              ...prev,
+              newExpiry: e.target.value,
+            }))
+          }
+        />
+      </Form.Group>
+    </Form>
+  </Modal.Body>
+  <Modal.Footer>
+    <Button variant="secondary" onClick={() => setRestockModal(false)}>
+      Cancel
+    </Button>
+    <Button variant="primary" onClick={handleRestockConfirm}>
+      Confirm Restock
+    </Button>
+  </Modal.Footer>
+</Modal>
     </div>
   );
 }

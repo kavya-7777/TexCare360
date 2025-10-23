@@ -17,8 +17,7 @@ router.get("/", async (req, res) => {
       qtyChange: parseInt(record.qty_change, 10) || 0, // ✅ force numeric
       user: record.user,
       date: record.created_at
-        ? record.created_at.toISOString().replace("T", " ").slice(0, 19)
-        : "",
+        
     }));
 
     return res.json(history); // ✅ always send JSON

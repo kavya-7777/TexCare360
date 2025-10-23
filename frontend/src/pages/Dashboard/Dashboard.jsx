@@ -11,7 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import {
-  Wrench, Users, Package as PackageIcon, Settings, Sun, Moon, Filter,
+  Wrench, Users, Package as PackageIcon, Settings,
 } from "lucide-react";
 
 const API_BASE = "http://localhost:5000/api";
@@ -36,7 +36,7 @@ async function fetchWithParams(endpoint, params = {}) {
 }
 
 export default function Dashboard() {
-  const [dark, setDark] = useState(false);
+  const [dark] = useState(false);
   const [machines, setMachines] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -44,12 +44,28 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   // Local filters
-  const [techSelector, setTechSelector] = useState("");
-  const [trendFrom, setTrendFrom] = useState("");
-  const [trendTo, setTrendTo] = useState("");
-  const [inventoryCategory, setInventoryCategory] = useState("");
-  const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [techSelector] = useState("");
+  const [trendFrom] = useState("");
+  const [trendTo] = useState("");
+  const [inventoryCategory] = useState("");
+  const [showLowStockOnly] = useState(false);
   const [gaugeThreshold, setGaugeThreshold] = useState(15);
+
+  const expiryData = useMemo(() => {
+  const today = new Date();
+  let expiringSoon = 0;
+  let expired = 0;
+
+  inventory.forEach(i => {
+    if (!i.expiry) return;
+    const expiryDate = new Date(i.expiry);
+    const diffDays = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) expired++;
+    else if (diffDays <= 7) expiringSoon++;
+  });
+
+  return { expiringSoon, expired };
+}, [inventory]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -96,7 +112,6 @@ export default function Dashboard() {
   ], [healthyCount, unhealthyCount]);
 
   // Technician workload
-  const techOptions = useMemo(() => [{ id: "", name: "All Technicians" }, ...technicians], [technicians]);
   const techWorkData = useMemo(() => {
     const selected = techSelector ? technicians.filter(t => t.id === techSelector) : technicians;
     return selected.map(t => {
@@ -121,7 +136,6 @@ export default function Dashboard() {
   }, [logs]);
 
   // Inventory category donut
-  const categories = useMemo(() => [...new Set(inventory.map(i => i.category).filter(Boolean))], [inventory]);
   const inventoryCategoryData = useMemo(() => {
     const map = {};
     inventory.forEach(i => {
@@ -149,6 +163,12 @@ export default function Dashboard() {
       { name: "OK", value: percentOk, color: "#e5e7eb" },
     ];
   }, [inventory, gaugeThreshold]);
+  const expiryPieData = useMemo(() => [
+  { name: "Expired", value: expiryData.expired, color: "#ef4444" },
+  { name: "Expiring Soon", value: expiryData.expiringSoon, color: "#f59e0b" },
+  { name: "Safe", value: totalInventoryItems - expiryData.expiringSoon - expiryData.expired, color: "#16a34a" }
+], [expiryData, totalInventoryItems]);
+
 
   return (
     <div className={`min-h-screen transition-colors ${dark ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
@@ -170,6 +190,12 @@ export default function Dashboard() {
           <KPI title="Technicians" value={totalTechs} subtitle={`${totalLogs} total logs`} icon={<Users size={20} />} />
           <KPI title="Inventory Items" value={totalInventoryItems} subtitle={`${lowStockCount} low-stock`} icon={<PackageIcon size={20} />} />
           <KPI title="Maintenance Logs" value={totalLogs} subtitle={`${maintenanceTrendData.length} active days`} icon={<Settings size={20} />} />
+          <KPI 
+  title="Expiry Alerts"
+  value={expiryData.expiringSoon + expiryData.expired}
+  subtitle={`${expiryData.expiringSoon} soon • ${expiryData.expired} expired`} 
+  icon={<PackageIcon size={20} />}
+/>
         </div>
 
         {/* Charts */}
@@ -196,7 +222,7 @@ export default function Dashboard() {
       <CartesianGrid strokeDasharray="3 3" />
       <XAxis
         dataKey="name"
-        angle={-30}
+        angle={-60}
         textAnchor="end"
         interval={0}
         tick={{ fontSize: 12, dy: 10 }} // dy gives vertical spacing between axis and bars
@@ -213,10 +239,16 @@ export default function Dashboard() {
           {/* Maintenance Trend */}
           <ChartCard title="Maintenance Trend">
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={maintenanceTrendData}>
+              <LineChart data={maintenanceTrendData} margin={{ top: 10, right: 30, left: 0, bottom: 50 }} >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis />
+                  <XAxis
+                    dataKey="date"
+                    angle={-60}
+                    textAnchor="end"
+                    interval={0}
+                    tick={{ fontSize: 12, dy: 10 }} // dy gives vertical spacing between axis and bars
+                  />    
+                  <YAxis />
                 <Tooltip />
                 <Line dataKey="count" stroke={COLORS.completed} strokeWidth={2} dot={false} />
               </LineChart>
@@ -224,16 +256,35 @@ export default function Dashboard() {
           </ChartCard>
 
           {/* Inventory Distribution */}
-          <ChartCard title="Inventory by Category">
-            <ResponsiveContainer width="100%" height={240}>
-              <PieChart>
-                <Pie data={inventoryCategoryData} innerRadius={50} outerRadius={80} label>
-                  {inventoryCategoryData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <RechartsTooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartCard>
+<ChartCard title="Inventory by Category">
+  <ResponsiveContainer width="100%" height={240}>
+    <PieChart>
+      <Pie data={inventoryCategoryData} innerRadius={50} outerRadius={80} label>
+        {inventoryCategoryData.map((e, i) => (
+          <Cell key={i} fill={e.color} />
+        ))}
+      </Pie>
+      <RechartsTooltip />
+    </PieChart>
+  </ResponsiveContainer>
+
+  {/* Legend Section */}
+  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px', gap: '15px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#5DA0FB', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Raw Materials</span>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#B59CFF', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Spare Parts</span>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#3AE8A5', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Maintenance Supplies</span>
+    </div>
+  </div>
+</ChartCard>
+
 
           {/* Stock Alert Gauge */}
           <ChartCard
@@ -248,8 +299,10 @@ export default function Dashboard() {
                 className="w-20 border rounded px-2 py-1 text-sm"
               />
             )}
-            legend="Shows % of SKUs under the threshold (low-stock)."
+            legend="Shows Inventory % under the threshold (low-stock)."
           >
+
+            
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie startAngle={180} endAngle={0} data={gaugeData} innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
@@ -258,12 +311,47 @@ export default function Dashboard() {
                 <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
-            <div className="text-center mt-2 text-sm text-gray-500">
-              Green = Safe • Amber = Warning • Red = Critical
-            </div>
           </ChartCard>
+
+          {/* Inventory Expiry Status */}
+<ChartCard title="Inventory Expiry Status" legend="Red = Expired, Orange = Expiring Soon, Green = Safe">
+  <ResponsiveContainer width="100%" height={240}>
+    <PieChart>
+      <Pie
+        data={expiryPieData}
+        dataKey="value"
+        innerRadius={50}
+        outerRadius={80}
+        label
+      >
+        {expiryPieData.map((e, i) => (
+          <Cell key={i} fill={e.color} />
+        ))}
+      </Pie>
+      <RechartsTooltip />
+    </PieChart>
+  </ResponsiveContainer>
+
+  {/* Legend Section */}
+  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px', gap: '15px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#ef4444', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Expired</span>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#f59e0b', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Expiring Soon (≤7 days)</span>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+      <div style={{ width: '12px', height: '12px', backgroundColor: '#16a34a', borderRadius: '3px' }}></div>
+      <span style={{ fontSize: '13px' }}>Safe</span>
+    </div>
+  </div>
+</ChartCard>
+
         </div>
 
+        
         {loading && (
           <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-900 rounded-lg p-8 shadow-lg flex flex-col items-center gap-3">
