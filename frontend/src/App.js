@@ -11,10 +11,11 @@ import { Container } from "react-bootstrap";
 import axios from "axios";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useAuth } from "./context/AuthContext";
+import Forbidden from "./pages/Forbidden/Forbidden"; // adjust the path as needed
 
 
 function App() {
-  const {loading } = useAuth();
+  const {loading, user} = useAuth();
   const [machines, setMachines] = useState([]);
   const [logs, setLogs] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -223,78 +224,86 @@ const addStockHistory = async (entry) => {
      <>
       <NavigationBar />
       <Container className="mt-5 pt-5">
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+<Routes>
+  {/* Public routes */}
+  <Route path="/login" element={<Login />} />
+  <Route path="/signup" element={<Signup />} />
+  <Route path="/" element={<Navigate to="/dashboard" />} />
 
-          <Route path="/" element={<Navigate to="/dashboard" />} />
+  {/* 403 page */}
+  <Route path="/forbidden" element={<Forbidden />} />
 
-          {/* ✅ Protected routes (requires user login) */}
-          <Route element={<ProtectedRoute />}>
-            
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route
-              path="/machines"
-              element={
-                <Machines
-                  machines={machines}
-                  setMachines={setMachines}
-                  assignTechnician={assignTechnician}
-                  technicians={technicians}
-                  setTechnicians={setTechnicians}
-                  logs={logs}
-                  setLogs={setLogs}
-                />
-              }
-            />
-            <Route
-              path="/technicians"
-              element={
-                <Technicians
-                  technicians={technicians}
-                  setTechnicians={setTechnicians}
-                />
-              }
-            />
-            <Route
-              path="/maintenance-logs"
-              element={
-                <MaintenanceLogs
-                  logs={logs}
-                  setLogs={setLogs}
-                  freeTechnician={freeTechnician}
-                  machines={machines}
-                  setMachines={setMachines}
-                  inventory={inventory}
-                  setInventory={setInventory}
-                  stockHistory={stockHistory}
-                  setStockHistory={setStockHistory}
-                />
-              }
-            />
-            <Route
-              path="/inventory"
-              element={
-                <Inventory
-                  inventory={inventory}
-                  setInventory={setInventory}
-                  logs={logs}
-                  setLogs={setLogs}
-                  stockHistory={stockHistory}
-                  setStockHistory={setStockHistory}
-                  machines={machines}
-                  setMachines={setMachines}
-                  addInventoryItem={addInventoryItem}
-                  updateInventoryItem={updateInventoryItem}
-                  deleteInventoryItem={deleteInventoryItem}
-                  addStockHistory={addStockHistory}
-                />
-              }
-            />
-          </Route>
-          <Route path="*" element={<Login />} />
-        </Routes>
+  {/* ✅ Routes allowed for BOTH Admin & Technician */}
+  <Route element={<ProtectedRoute allowedRoles={["Admin", "Technician"]} />}>
+    <Route path="/dashboard" element={<Dashboard />} />
+    <Route
+      path="/maintenance-logs"
+      element={
+        <MaintenanceLogs
+          logs={logs}
+          setLogs={setLogs}
+          freeTechnician={freeTechnician}
+          machines={machines}
+          setMachines={setMachines}
+          inventory={inventory}
+          setInventory={setInventory}
+          stockHistory={stockHistory}
+          setStockHistory={setStockHistory}
+          currentUser={user}
+        />
+      }
+    />
+  </Route>
+
+  {/* ✅ Admin-only routes */}
+  <Route element={<ProtectedRoute allowedRoles={["Admin"]} />}>
+    <Route
+      path="/machines"
+      element={
+        <Machines
+          machines={machines}
+          setMachines={setMachines}
+          assignTechnician={assignTechnician}
+          technicians={technicians}
+          setTechnicians={setTechnicians}
+          logs={logs}
+          setLogs={setLogs}
+        />
+      }
+    />
+    <Route
+      path="/technicians"
+      element={
+        <Technicians
+          technicians={technicians}
+          setTechnicians={setTechnicians}
+        />
+      }
+    />
+    <Route
+      path="/inventory"
+      element={
+        <Inventory
+          inventory={inventory}
+          setInventory={setInventory}
+          logs={logs}
+          setLogs={setLogs}
+          stockHistory={stockHistory}
+          setStockHistory={setStockHistory}
+          machines={machines}
+          setMachines={setMachines}
+          addInventoryItem={addInventoryItem}
+          updateInventoryItem={updateInventoryItem}
+          deleteInventoryItem={deleteInventoryItem}
+          addStockHistory={addStockHistory}
+        />
+      }
+    />
+  </Route>
+
+  {/* Fallback */}
+  <Route path="*" element={<Login />} />
+</Routes>
       </Container>
     </>  
   );

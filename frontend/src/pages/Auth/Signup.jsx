@@ -3,7 +3,7 @@ import React, { useState, useContext } from "react";
 import { AuthContext } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 
-const ROLES = ["Admin", "Technician", "Manager"];
+const ROLES = ["Admin", "Technician"];
 
 export default function Signup() {
   const { signup } = useContext(AuthContext);

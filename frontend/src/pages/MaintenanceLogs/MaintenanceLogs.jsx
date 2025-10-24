@@ -13,6 +13,7 @@ function MaintenanceLogs({
   setStockHistory,
   machines,
   setMachines,
+  currentUser,
 }) {
   const [showAlert, setShowAlert] = useState(false);
   const [lowStockAlert, setLowStockAlert] = useState("");
@@ -60,6 +61,11 @@ function MaintenanceLogs({
   // Confirm completion & deduct inventory
   const handleCompleteConfirm = async () => {
     if (!selectedLog) return;
+
+if (currentUser?.role === "Technician" && selectedLog.tech_id !== currentUser.id) {
+  setModalError("⚠️ You are not allowed to complete this task.");
+  return;
+}
 
     let updatedPartUsage = "";
 
@@ -229,17 +235,19 @@ await axios.post(`http://localhost:5000/api/machines/${selectedLog.machine_id}/u
                       <Badge bg="warning">In Progress</Badge>
                     )}
                   </td>
-                  <td>
-                    {!log.completed && (
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={() => handleCompleteClick(log)}
-                      >
-                        Mark Complete
-                      </Button>
-                    )}
-                  </td>
+<td>
+  {!log.completed && (
+    (currentUser?.role === "Admin" || log.techId === currentUser?.id) && (
+      <Button
+        variant="success"
+        size="sm"
+        onClick={() => handleCompleteClick(log)}
+      >
+        Mark Complete
+      </Button>
+    )
+  )}
+</td>
                 </tr>
               ))}
           </tbody>

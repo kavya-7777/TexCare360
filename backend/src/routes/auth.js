@@ -9,7 +9,7 @@ const SALT_ROUNDS = 10;
 const TOKEN_NAME = "token";
 const TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 
-const ALLOWED_ROLES = ["Admin", "Technician", "Manager"];
+const ALLOWED_ROLES = ["Admin", "Technician"];
 
 function createToken(payload) {
   return jwt.sign(payload, process.env.JWT_SECRET, { algorithm: "HS256", expiresIn: "7d" });
