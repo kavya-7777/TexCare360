@@ -72,40 +72,41 @@ npm start                 # Runs the frontend on http://localhost:3000
 
 ---
 
-🧠 Key Features
+### 🧠 Key Features
 
-✅ Role-based Access Control — Secure login for Admin, Manager, Technician
-✅ Machine Management — Track machine health (Healthy/Unhealthy)
-✅ Technician Assignment — Automated allocation based on skill & workload (Rule Based Assignment)
-✅ Maintenance Logs — Record date, parts used, and completion status
-✅ Inventory Tracking — Auto stock updates, category-wise filtering
-✅ Stock History & Audits — Transparent material usage tracking
-✅ Analytics Dashboard — Real-time charts for maintenance & stock data
-
----
-
-🗄️ Database Schema Overview
-
-✅ machines → Machine info + required skill
-✅ technicians → Technicians and availability status
-✅ inventory → Spare parts, raw materials, and consumables
-✅ maintenance_logs → Task details for machine repair
-✅ stock_history → Tracks every inventory change
-✅ users → Admins, Technicians, Managers with hashed passwords
+✅ Role-based Access Control — Secure login for Admin, Manager, Technician  
+✅ Machine Management — Track machine health (Healthy/Unhealthy)  
+✅ Technician Assignment — Automated allocation based on skill & workload (Rule Based Assignment)  
+✅ Maintenance Logs — Record date, parts used, and completion status  
+✅ Inventory Tracking — Auto stock updates, category-wise filtering  
+✅ Stock History & Audits — Transparent material usage tracking  
+✅ Analytics Dashboard — Real-time charts for maintenance & stock data  
 
 ---
 
-🚀 Future Enhancements
-✅ IoT sensor integration for real-time machine health monitoring
-✅ Predictive maintenance using ML models
-✅ Mobile app support for technicians
-✅ Automated purchase order generation for low inventory
-✅ Advanced analytics with comparative charts
+### 🗄️ Database Schema Overview
+
+✅ machines → Machine info + required skill  
+✅ technicians → Technicians and availability status  
+✅ inventory → Spare parts, raw materials, and consumables  
+✅ maintenance_logs → Task details for machine repair  
+✅ stock_history → Tracks every inventory change  
+✅ users → Admins, Technicians, Managers with hashed passwords  
 
 ---
 
-👩‍💻 Author
--> Kavya M
--> Bachelor of Engineering, Computer Science and Design
+### 🚀 Future Enhancements
 
-“TexCare360 transforms manual maintenance tracking into a centralized, data-driven industrial solution.”
+✅ IoT sensor integration for real-time machine health monitoring  
+✅ Predictive maintenance using ML models  
+✅ Mobile app support for technicians  
+✅ Automated purchase order generation for low inventory  
+✅ Advanced analytics with comparative charts  
+
+---
+
+### 👩‍💻 Author
+-> Kavya M  
+-> Bachelor of Engineering, Computer Science and Design  
+
+**TexCare360 transforms manual maintenance tracking into a centralized, data-driven industrial solution.**
