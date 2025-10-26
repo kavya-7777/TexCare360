@@ -17,7 +17,7 @@ TexCare360 is a full-stack industrial management platform designed to streamline
 ---
 
 ## Project Structure
-
+```
 TexCare360/
 │
 ├── frontend/ # React.js client
@@ -38,6 +38,7 @@ TexCare360/
 │ └── setup.sql # Database creation + sample data
 │
 └── README.md
+```
 
 ---
 
@@ -47,20 +48,27 @@ TexCare360/
 ```bash
 git clone https://github.com/kavya-7777/TexCare360.git
 cd TexCare360
+```
 
 ### 2. Setup the Database
+```
 mysql -u root -p < sql/setup.sql
+```
 
 ### 3. Backend Setup
+```
 cd backend
 cp .env.example .env      # Add your own credentials if needed
 npm install
 npm run dev               # Starts the backend server on http://localhost:5000
+```
 
 ### 4. Frontend Setup
+```
 cd frontend
 npm install
 npm start                 # Runs the frontend on http://localhost:3000
+```
 
 ---
 
