@@ -1,4 +1,4 @@
-// Dashboard.jsx
+// frontend/src/pages/Dashboard/Dashboard.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";

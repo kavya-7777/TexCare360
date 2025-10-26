@@ -1,3 +1,5 @@
+// frontend/src/App.js
+
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Navigate} from "react-router-dom";import NavigationBar from "./components/NavigationBar/NavigationBar";
 import Login from "./pages/Auth/Login";

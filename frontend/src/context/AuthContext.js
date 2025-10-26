@@ -1,3 +1,5 @@
+// frontend/src/context/AuthContext.js
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
@@ -42,7 +44,4 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// ✅ Add this hook so you can import { useAuth }
 export const useAuth = () => useContext(AuthContext);
-
-

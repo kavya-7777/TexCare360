@@ -1,3 +1,5 @@
+// frontend/src/pages/MaintenanceLogs/MaintenanceLogs.jsx
+
 import React, { useEffect, useState } from "react";
 import { Table, Alert, Button, Badge, Modal, Form } from "react-bootstrap";
 import axios from "axios";
@@ -237,17 +239,16 @@ await axios.post(`http://localhost:5000/api/machines/${selectedLog.machine_id}/u
                   </td>
 <td>
   {!log.completed && (
-    (currentUser?.role === "Admin" || log.techId === currentUser?.id) && (
-      <Button
-        variant="success"
-        size="sm"
-        onClick={() => handleCompleteClick(log)}
-      >
-        Mark Complete
-      </Button>
-    )
+    <Button
+      variant="success"
+      size="sm"
+      onClick={() => handleCompleteClick(log)}
+    >
+      Mark Complete
+    </Button>
   )}
 </td>
+
                 </tr>
               ))}
           </tbody>

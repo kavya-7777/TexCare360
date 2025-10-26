@@ -1,3 +1,5 @@
+// frontend/src/pages/Machines/Machines.jsx
+
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Table, Badge, Button, Modal } from "react-bootstrap";

@@ -1,3 +1,5 @@
+// frontend/src/components/NavigationBar/NavigationBar.jsx
+
 import React from "react";
 import { Navbar, Nav, Container } from "react-bootstrap";
 import { Link } from "react-router-dom";

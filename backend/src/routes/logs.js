@@ -1,3 +1,5 @@
+// backend/routes/logs.js
+
 const express = require("express");
 const router = express.Router();
 const pool = require("../db"); // ✅ MySQL connection pool

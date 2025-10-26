@@ -1,3 +1,5 @@
+// frontend/src/pages/Inventory/Inventory.jsx
+
 import React, { useState, useEffect  } from "react";
 import { Table, Button, Modal, Form, Badge, Alert } from "react-bootstrap";
 import axios from "axios";

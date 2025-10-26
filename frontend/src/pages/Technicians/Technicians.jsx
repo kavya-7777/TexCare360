@@ -1,3 +1,5 @@
+// frontend/src/pages/Technicians/Technicians.jsx
+
 import React, { useState, useEffect } from "react";
 import { Table, Button, Modal, Form, Badge } from "react-bootstrap";
 import "./Technicians.css";
