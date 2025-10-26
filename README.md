@@ -72,7 +72,7 @@ npm start                 # Runs the frontend on http://localhost:3000
 
 ---
 
-### 🧠 Key Features
+## 🧠 Key Features
 
 ✅ Role-based Access Control — Secure login for Admin, Manager, Technician  
 ✅ Machine Management — Track machine health (Healthy/Unhealthy)  
@@ -84,7 +84,7 @@ npm start                 # Runs the frontend on http://localhost:3000
 
 ---
 
-### 🗄️ Database Schema Overview
+## 🗄️ Database Schema Overview
 
 ✅ machines → Machine info + required skill  
 ✅ technicians → Technicians and availability status  
@@ -95,7 +95,7 @@ npm start                 # Runs the frontend on http://localhost:3000
 
 ---
 
-### 🚀 Future Enhancements
+## 🚀 Future Enhancements
 
 ✅ IoT sensor integration for real-time machine health monitoring  
 ✅ Predictive maintenance using ML models  
@@ -105,7 +105,7 @@ npm start                 # Runs the frontend on http://localhost:3000
 
 ---
 
-### 👩‍💻 Author
+## 👩‍💻 Author
 -> Kavya M  
 -> Bachelor of Engineering, Computer Science and Design  
 
